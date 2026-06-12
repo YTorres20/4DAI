@@ -1,0 +1,56 @@
+# ========================
+# Virtual Environment
+# ========================
+venv/
+env/
+.venv/
+
+# ========================
+# Python cache files
+# ========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ========================
+# Streamlit cache
+# ========================
+.streamlit/
+.streamlit/*
+.cache/
+.cache/*
+
+# ========================
+# Jupyter Notebook (if used)
+# ========================
+.ipynb_checkpoints/
+
+# ========================
+# Environment variables
+# ========================
+.env
+
+# ========================
+# OS files
+# ========================
+.DS_Store
+Thumbs.db
+
+# ========================
+# Logs
+# ========================
+*.log
+
+# ========================
+# Images (your project data)
+# ========================
+Server/images/
+images/
+
+# ========================
+# MongoDB dumps (if ever created)
+# ========================
+*.archive
+*.bson
+*.json.gz
