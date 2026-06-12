@@ -1,9 +1,9 @@
 # ========================
 # Virtual Environment
 # ========================
-venv/
-env/
-.venv/
+app/
+app/
+.app/
 
 # ========================
 # Python cache files
