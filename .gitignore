@@ -1,56 +1,26 @@
-# ========================
 # Virtual Environment
-# ========================
 app/
-app/
-.app/
 
-# ========================
-# Python cache files
-# ========================
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# ========================
 # Streamlit cache
-# ========================
 .streamlit/
-.streamlit/*
 .cache/
-.cache/*
 
-# ========================
-# Jupyter Notebook (if used)
-# ========================
-.ipynb_checkpoints/
-
-# ========================
-# Environment variables
-# ========================
-.env
-
-# ========================
 # OS files
-# ========================
 .DS_Store
 Thumbs.db
 
-# ========================
-# Logs
-# ========================
-*.log
-
-# ========================
-# Images (your project data)
-# ========================
+# Images
 Server/images/
 images/
 
-# ========================
-# MongoDB dumps (if ever created)
-# ========================
-*.archive
-*.bson
-*.json.gz
+# Logs
+*.log
+
+# Env files
+.env
