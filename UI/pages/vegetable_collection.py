@@ -56,7 +56,7 @@ if submit:
         sample_id = response.json()["sample_id"]
   
 
-        for i, image  in enumerate(st.session_state.images):
+        for i, image in enumerate(st.session_state.images):
             files = {
             "file": (f"image{i}.jpg", image.getvalue(), "image/jpeg")
             }

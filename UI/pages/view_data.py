@@ -12,6 +12,8 @@ data = response.json()
 vegetables = data["vegetables"]
 soils = data["soils"]
 
+
+
 for vegetable in vegetables:
 
     st.subheader(vegetable["vegetable_name"])
@@ -19,6 +21,10 @@ for vegetable in vegetables:
     st.write("Health:", vegetable["vegetable_health"])
     st.write("Date:", vegetable["date"])
     st.write("Notes:", vegetable["notes"])
+
+    for image_id in vegetable["images"]:
+        img_response = requests.get(f"{URL}/image/{image_id}")
+        st.image(img_response.content)
 
     st.divider()
 
@@ -29,6 +35,10 @@ for soil in soils:
     st.write ("Soil type:", soil["soil_type"])
     st.write ("Moisture:", soil["soil_moisture"])
     st.write ("Notes:", soil["notes"])
+
+    for image_id in soil["images"]:
+        img_response = requests.get(f"{URL}/image/{image_id}")
+        st.image(img_response.content)
     
     st.divider()
 
@@ -45,6 +55,13 @@ for vegetable in vegetables:
         st.write("Date:", vegetable["date"])
         st.write("Notes:", vegetable["notes"])
 
+        for image_id in vegetable["images"]:
+            img_response = requests.get(f"{URL}/image/{image_id}")
+            st.image(img_response.content)
+
+
+
+
         st.divider()
 
 for soil in soils:
@@ -56,5 +73,9 @@ for soil in soils:
         st.write("Moisture:", soil["soil_moisture"])
         st.write("Date:", soil["date"])
         st.write("Notes:", soil["notes"])
+
+        for image_id in soil["images"]:
+            img_response = requests.get(f"{URL}/image/{image_id}")
+            st.image(img_response.content)
 
         st.divider()

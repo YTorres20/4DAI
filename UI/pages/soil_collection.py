@@ -55,7 +55,7 @@ if submit:
             }
             data = {
                 "sample_id": sample_id,
-                "mode": "soil"
+                "mode": "soils"
             }
             img_response = requests.post(
                 f"{URL}/images",

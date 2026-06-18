@@ -1,4 +1,5 @@
 from fastapi import FastAPI,UploadFile,File,Form 
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from db import vegetable_collections, soil_collections, image_collections
 import os 
@@ -31,29 +32,12 @@ def create_vegetable(data:VegSample):
     })
     return {"sample_id": sample_id}
 
-@app.get("/data/{sample_id}")
-def get_sample(sample_id:str):
-    sample = vegetable_collections.find_one({
-        "_id": sample_id
-    })
-    if sample is None:
-        return {
-            "error": "SAMPLE NOT FOUND!"
-        }
-    return {
-        "id": sample["_id"],
-        "vegetable_name": sample["vegetable_name"],
-        "vegetable_health": sample ["vegetable_health"],
-        "date": sample["date"],
-        "notes":sample["notes"]
-
-    }
 @app.post("/images")
 def upload_image(sample_id:str = Form(...), mode: str = Form(...), file:UploadFile = File(...)):
-    if mode == "vegetable":
+    if mode == "vegetables":
         folder_path = f"images/vegetables/{sample_id}"
 
-    elif mode == "soil":
+    elif mode == "soils":
         folder_path = f"images/soils/{sample_id}"
 
     os.makedirs(folder_path,exist_ok=True)
@@ -82,12 +66,16 @@ def get_all_data():
     soils = soil_collections.find()
 
     return {
+        
         "vegetables":[{
             "id": vegetable["_id"],
             "vegetable_name": vegetable ["vegetable_name"],
             "vegetable_health" : vegetable ["vegetable_health"],
             "date": vegetable["date"],
-            "notes": vegetable ["notes"]
+            "notes": vegetable ["notes"],
+            "images": [image["_id"] for image in image_collections.find({
+                "sample_id":vegetable["_id"]
+            })]
         } for vegetable in vegetables],
 
         "soils": [{
@@ -95,7 +83,10 @@ def get_all_data():
             "soil_type": soil["soil_type"],
             "soil_moisture": soil["soil_moisture"],
             "date": soil["date"],
-            "notes": soil["notes"]
+            "notes": soil["notes"],
+            "images":[image["_id"] for image in image_collections.find({
+                "sample_id": soil["_id"]
+            })]
 
         }for soil in soils]
     }
@@ -112,3 +103,13 @@ def create_soil_sample(data:SoilSample):
         "notes":data.notes
     })
     return {"sample_id": sample_id}
+
+@app.get("/image/{image_id}")
+def get_images(image_id:str):
+  image = image_collections.find_one({
+      "_id": image_id
+  })
+
+  if image is None:
+      return {"error": "IMAGE NOT FOUND"}
+  return FileResponse(path=image["image_path"])
