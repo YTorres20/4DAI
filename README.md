@@ -12,6 +12,9 @@ The application supports:
 * MongoDB data storage
 * Querying and viewing collected data
 
+<img src= "Assets/image1.png" height= "500" width= "700">
+
+<img src= "Assets/image2.png" height= "500" width= "700">
 ---
 
 ## Technologies Used
@@ -29,9 +32,24 @@ The application supports:
 
 * MongoDB
 
+### Networking / Deployment 
+- ngrok (for remote access)
+
 ### Programming Language
 
 * Python 3.10+
+
+---
+## Installation References
+- MongoDB
+
+Installed using the official MongoDB installation guide:
+https://www.mongodb.com/docs/manual/installation/
+
+- ngrok
+
+Installed and configured using:
+https://ngrok.com/docs/getting-started/
 
 ---
 
@@ -70,6 +88,8 @@ Users can:
 * Add notes
 * Upload images
 
+<img src= "Assets/image3.png" height= "500" width= "700">
+
 ### Soil Collection
 
 Users can:
@@ -80,6 +100,7 @@ Users can:
 * Add notes
 * Upload images
 
+<img src= "Assets/image4.png" height= "500" width= "700">
 ---
 
 ## Image Storage
@@ -183,7 +204,7 @@ cd Server
 Start the server:
 
 ```bash
-uvicorn main:app --reload
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 Server runs at:
@@ -191,29 +212,32 @@ Server runs at:
 ```
 http://127.0.0.1:8000
 ```
+---
+## Exposing Backend (ngrok)
+Because the frontend runs on a different machine, the backend is exposed using ngrok.
 
-Swagger docs:
+Start tunnel:
+```bash
+ngrok http 8000
+```
+Example output:
+```
+Forwarding https://xxxx.ngrok-free.app -> http://localhost:8000
 
 ```
-http://127.0.0.1:8000/docs
-```
+
+Note: The ngrok URL changes whenever the tunnel is restarted. Update `UI/key.py` with the new URL before running the Streamlit application.
 
 ---
 
 ## UI Configuration
-
 The Streamlit UI connects to the server using:
 
+Update Streamlit configuration:
 ```python
 # UI/key.py
 
-URL = "http://localhost:8000"
-```
-
-When deploying to another machine:
-
-```python
-URL = "http://<SERVER_IP>:8000"
+URL = "https://xxxx.ngrok-free.app"
 ```
 
 ---
@@ -273,7 +297,6 @@ GET /data
 
 ## Future Improvements
 
-* User authentication
 * Remote camera integration
 * Data analytics dashboard
 * Automated plant health detection
