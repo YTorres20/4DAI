@@ -61,12 +61,12 @@ for sample in samples:
 
                 images_list = requests.get(f"{URL}/collection/images/{sample_id}").json()
 
+                columns = st.columns(3)
             st.write("## Captured Images")
             for count, image in enumerate(images_list):
                 image_id = image["image_id"]
                 actual_image = requests.get(f"{URL}/collection/image/{image_id}")
 
-                columns = st.columns(3)
 
                 with columns[count % 3]:
                     st.image(actual_image.content,caption=f"Image ID: {image_id}",width="stretch")

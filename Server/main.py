@@ -14,7 +14,7 @@ os.makedirs(settings_folder,exist_ok=True)
 
 @app.post("/collection/submission")
 def submission(submission:dict):
-    category = submission["category"]
+    category = submission["category"].lower()
     table = db[category]
     sample_id = str(uuid.uuid4())
     
@@ -27,7 +27,7 @@ def submission(submission:dict):
 
 @app.post("/collection/images/upload")
 def upload_image(sample_id: str = Form(...), category:str = Form(...), file:UploadFile = File(...)):
-    image_folder = f"images/{category}/{sample_id}"
+    image_folder = f"images/{category.lower()}/{sample_id}"
     os.makedirs(image_folder,exist_ok=True)
 
     image_id = str(uuid.uuid4())
@@ -50,7 +50,7 @@ def upload_image(sample_id: str = Form(...), category:str = Form(...), file:Uplo
 
 @app.get("/collection/samples/{selection}")
 def get_samples(selection:str):
-    table = db[selection]
+    table = db[selection.lower()]
    
     cursor = table.find({})
     
@@ -65,7 +65,7 @@ def get_samples(selection:str):
 
 @app.get("/settings/{category}")
 def get_collections_configuration(category:str):
-    with open(f"{settings_folder}/{category}.json") as infile:
+    with open(f"{settings_folder}/{category.lower()}.json") as infile:
         settings = json.load(infile)
     return settings 
 
@@ -74,7 +74,7 @@ def home_configuration():
     categories = []
 
     for file_name in os.listdir(settings_folder):
-        categories.append(file_name.removesuffix(".json"))
+        categories.append(file_name.removesuffix(".json").lower())
 
     return categories
 
@@ -104,11 +104,11 @@ def get_list_sample_images(sample_id: str):
 
 @app.post("/settings")
 def create_page_configuration(page:dict):
-    category = page["category"]
+    category = page["category"].lower()
     folder_path = "settings/"
 
     os.makedirs(folder_path,exist_ok=True)
-    file_path = f"{folder_path}/{category}.json"
+    file_path = f"{folder_path}/{category.lower()}.json"
 
     with open(file_path,"w") as infile:
         json.dump(page,infile,indent=4)

@@ -21,7 +21,7 @@ for prompt in prompts:
         case "Text Box":
             values[prompt["prompt"]] = st.text_input(prompt["prompt"])
 
-        case "Text area (multi-line)":
+        case "Text Area (multi-line)":
             values[prompt["prompt"]] = st.text_area(prompt["prompt"])
         
         case "Number Input":
@@ -59,13 +59,6 @@ if "robo_submission" not in st.session_state:
     st.session_state.robo_submission = False 
 
 if st.button("Submit"):
-    for prompt in prompts:
-        if prompt.get("required") == "True":
-            value = values[prompt["prompt"]]
-
-            if isinstance(value, str) and not value.strip():
-                st.write(f'{prompt["prompt"]} is required.')
-                st.stop()   
         
     today= date.today()
      

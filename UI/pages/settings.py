@@ -1,5 +1,4 @@
 import streamlit as st 
-from streamlit_option_menu import option_menu
 from key import URL 
 import requests 
 import time 
@@ -30,10 +29,8 @@ settings = {
             "prompt": prompt 
             }
     
-if selection == "Text Box" or selection == "Text Area (multi-line)":
-    settings["required"] = st.radio("Required:",["True", "False"],key="required_ratio")
         
-elif selection == "Number Input" or selection == "Slider":
+if selection == "Number Input" or selection == "Slider":
 
     settings["max"]= st.number_input("Enter max value:")
     settings["min"] = st.number_input("Enter min value:")
