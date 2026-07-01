@@ -12,9 +12,8 @@ The application supports:
 * MongoDB data storage
 * Querying and viewing collected data
 
-<img src= "Assets/image1.png" height= "500" width= "700">
 
-<img src= "Assets/image2.png" height= "500" width= "700">
+<img src= "Assets/new_image1.png" height= "500" width= "700">
 ---
 
 ## Technologies Used
@@ -60,15 +59,20 @@ project/
 │
 ├── Server/
 │   ├── main.py
-│   ├── db.py
-│   └── images/
-│       ├── vegetables/
-│       └── soils/
+│   ├── images/
+│   │   └── category_name/
+│   │       └── sample_id/
+│   │
+│   └── settings/
+│       └── category_settings.json
 │
 ├── UI/
 │   ├── home.py
 │   ├── key.py
 │   └── pages/
+│       ├── settings.py
+│       ├── collection.py
+│       └── view_data.py
 │
 ├── requirements.txt
 └── README.md
@@ -78,30 +82,56 @@ project/
 
 ## Features
 
-### Vegetable Collection
+### Settings Management
 
+The Settings page allows users to create and manage collection categories.
 Users can:
 
-* Enter vegetable name
-* Enter vegetable health status
-* Select collection date
-* Add notes
-* Upload images
+- Create unlimited categories
+- Define custom prompts for each category
+- Select input types for prompts
+- Save category configurations
+- Store category settings as JSON files
+- Category configurations are stored on the server in:
+```
+Server/
+└── settings/
+    └── *.json
+```
 
-<img src= "Assets/image3.png" height= "500" width= "700">
+<img src= "Assets/new_image2.png" height= "500" width= "700">
 
-### Soil Collection
 
-Users can:
-
-* Enter soil type
-* Enter soil moisture information
-* Select collection date
-* Add notes
-* Upload images
-
-<img src= "Assets/image4.png" height= "500" width= "700">
 ---
+### Dynamic Data Collection
+collection forms are automatically generated from the selected category settings.
+
+Supported prompt types include:
+- Text Box
+- Number Input
+- Date Input
+- Dropdown Selection
+- Text Area
+- Additional custom prompt types
+
+Users can:
+- Select a category
+- omplete category-specific prompts
+- Upload sample images
+- Submit sample data
+
+---
+### Roboflow Integration
+The Settings page includes optional integration with Roboflow.
+
+When creating or editing a category, users can choose to enable Roboflow integration. If enabled, the application prompts the user to enter:
+- Roboflow API Key
+- Workspace Name
+- Project ID
+
+These settings are stored within the category's configuration file and can be used by future application features that interact with Roboflow services.
+
+
 
 ## Image Storage
 
@@ -118,6 +148,18 @@ images/
 
 Each image is assigned a unique image ID and linked to a `sample_id`.
 
+---
+### Data Viewing
+The View Data page allows users to browse and filter collected information.
+
+Users can:
+- Filter by category
+- Filter by collection date
+- View sample IDs
+- View image IDs
+- View collected prompt information
+- Browse stored sample records
+- Download Images
 ---
 
 ## Installation

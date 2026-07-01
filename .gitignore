@@ -24,3 +24,5 @@ images/
 
 # Env files
 .env
+
+settings/

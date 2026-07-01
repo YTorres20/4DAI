@@ -1,81 +1,81 @@
 import streamlit as st
 import requests
 from key import URL
+from datetime import datetime
+import json 
 
-st.title("View Data")
+st.title("View Collections")
 
-response = requests.get(
-    f"{URL}/data"
+categories = requests.get(f"{URL}/home").json()
+
+if not categories:
+   st.write("No Categories")
+   st.stop()
+
+selection = st.selectbox("Select Category:", categories)
+
+st.divider()
+
+samples_response = requests.get(f"{URL}/collection/samples/{selection}")
+
+if samples_response.status_code != 200:
+    st.error("Failed to load collection data.")
+    st.stop()
+
+samples = samples_response.json()
+
+if not samples:
+    st.info(f"No submissions found for {selection} yet.")
+    st.stop()
+
+st.header("Filter")
+
+today = datetime.today().date()
+date_range = st.date_input(
+    "Select Date Range:",
+    value=(today, today),
+    max_value=today
 )
 
-data = response.json()
-vegetables = data["vegetables"]
-soils = data["soils"]
+matching_samples_found = False
 
+for sample in samples:
+    sample_id = sample["sample_id"]
 
+    try:
+        sample_date = datetime.strptime(sample["date"], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        sample_date = None 
 
-for vegetable in vegetables:
+    matching_samples_found = True 
+    sample_information = sample["data"]
 
-    st.subheader(vegetable["vegetable_name"])
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        start_date, end_date = date_range
+        if sample_date and not (start_date <= sample_date <= end_date):
+            continue  # Skip this sample if outside range
 
-    st.write("Health:", vegetable["vegetable_health"])
-    st.write("Date:", vegetable["date"])
-    st.write("Notes:", vegetable["notes"])
+        with st.expander(f"Sample ID: {sample_id}, Date: {sample['date']}"):
+            for question, answer in sample_information.items():
+                st.write(f"**{question}:** {answer}")
 
-    for image_id in vegetable["images"]:
-        img_response = requests.get(f"{URL}/image/{image_id}")
-        st.image(img_response.content)
+                images_list = requests.get(f"{URL}/collection/images/{sample_id}").json()
 
-    st.divider()
+            st.write("## Captured Images")
+            for count, image in enumerate(images_list):
+                image_id = image["image_id"]
+                actual_image = requests.get(f"{URL}/collection/image/{image_id}")
 
-for soil in soils:
+                columns = st.columns(3)
 
-    st.subheader(soil["date"])
-    
-    st.write ("Soil type:", soil["soil_type"])
-    st.write ("Moisture:", soil["soil_moisture"])
-    st.write ("Notes:", soil["notes"])
+                with columns[count % 3]:
+                    st.image(actual_image.content,caption=f"Image ID: {image_id}",width="stretch")
 
-    for image_id in soil["images"]:
-        img_response = requests.get(f"{URL}/image/{image_id}")
-        st.image(img_response.content)
-    
-    st.divider()
-
-
-search = st.text_input("Search vegetable and soil collection date")
-
-for vegetable in vegetables:
-
-    if search.lower() in vegetable["vegetable_name"].lower():
-
-        st.subheader(vegetable["vegetable_name"])
-
-        st.write("Health:", vegetable["vegetable_health"])
-        st.write("Date:", vegetable["date"])
-        st.write("Notes:", vegetable["notes"])
-
-        for image_id in vegetable["images"]:
-            img_response = requests.get(f"{URL}/image/{image_id}")
-            st.image(img_response.content)
-
-
-
-
-        st.divider()
-
-for soil in soils:
-
-    if search.lower() in soil["date"].lower():
-
-        st.subheader(soil["date"])
-
-        st.write("Moisture:", soil["soil_moisture"])
-        st.write("Date:", soil["date"])
-        st.write("Notes:", soil["notes"])
-
-        for image_id in soil["images"]:
-            img_response = requests.get(f"{URL}/image/{image_id}")
-            st.image(img_response.content)
-
-        st.divider()
+                    st.download_button(
+                        label="Download Image",
+                        data=actual_image.content,
+                        file_name=f"{selection}_{image_id}.jpg",
+                        mime="image/jpeg",
+                        key=f"btn_{image_id}"
+                        )
+ 

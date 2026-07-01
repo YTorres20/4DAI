@@ -1,23 +1,45 @@
-import streamlit as st 
-import requests 
+import streamlit as st
+import requests
+from key import URL 
 
-st.title("Vegetable & Moisture Monitoring System")
-st.markdown("### Welcome to vegetable and moisture monitoring system")
-st.write("""
-        Use the side bar to navigate between:
-         - Vegetable Collection
-         - Soil Collection 
-         """)
+# =========================================================================
+# 1. MAIN DASHBOARD CONTENT VIEW
+# =========================================================================
 
+def show_home_dashboard():
+    st.session_state.category = None
+    st.title("Collections")
+    st.write("Pick a Collection")
 
-col1,col2  = st.columns(2)
+    FIXED_COL = 6 
 
-with col1:
-   veg_button = st.button("Vegetable Collection")
-   if veg_button:
-      st.switch_page("pages/vegetable.py")
-with col2:
-   soil_button = st.button("Soil Collection")
-   if soil_button:
-      st.switch_page("pages/soil.py")
-   
+    categories = requests.get(f"{URL}/home").json()
+    if not categories:
+       st.write("No Categories")
+       st.stop()
+
+    categories.sort()
+
+    columns = st.columns(FIXED_COL)
+    count = len(categories)
+
+    for i in range(count):
+       with columns[i % FIXED_COL]:
+          if st.button(f"{categories[i]}", key=categories[i]):
+             st.session_state.category = categories[i]
+             st.switch_page(collection_page)
+
+# =========================================================================
+# 2. APP NAVIGATION ROUTER
+# =========================================================================
+
+# Passes the function directly to break the recursion loop!
+home_page = st.Page(show_home_dashboard, title="Home", icon="🏠", default=True)
+
+collection_page = st.Page("pages/collection.py", title="Collection Form", visibility="hidden")
+view_data_page = st.Page("pages/view_data.py", title="View Collections", icon="📊")
+settings_page = st.Page("pages/settings.py", title="Settings Manager", icon="⚙️")
+
+# Render sidebar navigation tree
+pg = st.navigation([home_page, view_data_page, settings_page,collection_page])
+pg.run()
