@@ -33,6 +33,7 @@ def show_home_dashboard():
 # 2. APP NAVIGATION ROUTER
 # =========================================================================
 
+
 # Passes the function directly to break the recursion loop!
 home_page = st.Page(show_home_dashboard, title="Home", icon="🏠", default=True)
 

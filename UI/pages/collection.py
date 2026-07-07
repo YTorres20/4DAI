@@ -14,30 +14,30 @@ prompts = page["prompts"]
 
 values = {}
 
-for prompt in prompts:
+for count, prompt in enumerate(prompts):
     selection = prompt["selection"]
 
     match selection:
         case "Text Box":
-            values[prompt["prompt"]] = st.text_input(prompt["prompt"])
+            values[prompt["prompt"]] = st.text_input(prompt["prompt"], key=f"input_{prompt['prompt']}{count}")
 
         case "Text Area (multi-line)":
-            values[prompt["prompt"]] = st.text_area(prompt["prompt"])
+            values[prompt["prompt"]] = st.text_area(prompt["prompt"], key=f"input_{prompt['prompt']}{count}")
         
         case "Number Input":
-            values[prompt["prompt"]] = st.number_input(prompt["prompt"],min_value=prompt["min"], max_value=prompt["max"])
+            values[prompt["prompt"]] = st.number_input(prompt["prompt"], min_value=prompt["min"], max_value=prompt["max"], key=f"input_{prompt['prompt']}{count}")
         
         case "Dropdown List":
-            options = prompt["options"].split(",")
-            values[prompt["prompt"]] = st.selectbox(prompt["prompt"],options=options)
+            options = [opt.strip() for opt in prompt["options"].split(",")]
+            values[prompt["prompt"]] = st.selectbox(prompt["prompt"], options=options, key=f"input_{prompt['prompt']}{count}")
 
         case "Radio Button":
-            options = prompt["options"].split(",")
-            values[prompt["prompt"]] = st.radio(prompt["prompt"],options=options)
+            options = [opt.strip() for opt in prompt["options"].split(",")]
+            values[prompt["prompt"]] = st.radio(prompt["prompt"], options=options, key=f"input_{prompt['prompt']}{count}")
         
-        case "slider":
-            values[prompt["prompt"]] = st.slider(prompt["prompt"], max_value=prompt["max"], min_value=prompt["min"])
-
+        case "Slider": 
+            values[prompt["prompt"]] = st.slider(prompt["prompt"], min_value=prompt["min"], max_value=prompt["max"], key=f"input_{prompt['prompt']}{count}")
+        
 use_camera = page["camera"]
 
 if "images" not in st.session_state:
@@ -77,6 +77,7 @@ if st.button("Submit"):
         sample_id = response["sample_id"]
         
         for image in st.session_state.images:
+            image.seek(0)
             response = requests.post(f"{URL}/collection/images/upload",
                                      files = {
                                          "file": image
@@ -95,7 +96,7 @@ if st.button("Submit"):
             st.session_state.submitted = True 
             st.session_state.sample_id = sample_id
 
-            if not page["roboflow"] == "False":
+            if not page["roboflow"] == False:
                 # REWIND THE FILE POINTER SO ROBOFLOW CAN READ IT
                 image.seek(0)
                 roboflow_settings = page["roboflow"]
@@ -130,7 +131,7 @@ if st.button("Submit"):
                 if roboflow_response.status_code == 200:
                     st.session_state.robo_submission = True 
 
-
+        st.session_state.images = []
         st.rerun()           
 
 if st.session_state.submitted:

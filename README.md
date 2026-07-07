@@ -1,58 +1,65 @@
-# Soil and Vegetable Monitoring System
+# Dynamic Data Collection Platform
 
 ## Overview
 
-The Soil and Vegetable Monitoring System is a web-based application designed to collect, store, and manage vegetable and soil sample data. The system provides a Streamlit user interface for data collection and a FastAPI backend (Server) for data storage and retrieval.
+The Dynamic Data Collection Platform is a web-based application designed to create, manage, and collect custom datasets through dynamically generated forms and image capture. The system consists of a Streamlit frontend for user interaction and a FastAPI backend for data storage and retrieval.
+
+Unlike traditional collection systems that are limited to specific data types, this platform allows users to create their own collection categories, define custom prompts, capture multiple images per sample, and optionally synchronize collected data with Roboflow.
 
 The application supports:
 
-* Vegetable data collection
-* Soil data collection
-* Image uploads for samples
+* Custom category creation
+* Dynamic form generation
+* Multiple image capture per sample
 * MongoDB data storage
-* Querying and viewing collected data
-
-
-<img src= "Assets/new_image1.png" height= "500" width= "700">
+* Image management and downloads
+* Date-based filtering
+* Roboflow integration
+* Category editing and management
 ---
 
-## Technologies Used
+# Technologies Used
 
-### Frontend
+## Frontend
 
 * Streamlit
 
-### Backend (Server)
+## Backend
 
 * FastAPI
 * Uvicorn
 
-### Database
+## Database
 
 * MongoDB
 
-### Networking / Deployment 
-- ngrok (for remote access)
+## Networking / Deployment
 
-### Programming Language
+* ngrok (optional remote access)
+
+## Programming Language
 
 * Python 3.10+
 
 ---
-## Installation References
-- MongoDB
 
-Installed using the official MongoDB installation guide:
+# Installation References
+
+## MongoDB
+
+Installed using the official MongoDB documentation:
+
 https://www.mongodb.com/docs/manual/installation/
 
-- ngrok
+## ngrok
 
 Installed and configured using:
+
 https://ngrok.com/docs/getting-started/
 
 ---
 
-## Project Structure
+# Project Structure
 
 ```text
 project/
@@ -64,7 +71,7 @@ project/
 │   │       └── sample_id/
 │   │
 │   └── settings/
-│       └── category_settings.json
+│       └── category.json
 │
 ├── UI/
 │   ├── home.py
@@ -80,114 +87,178 @@ project/
 
 ---
 
-## Features
+# Features
 
-### Settings Management
+## Category Management
 
-The Settings page allows users to create and manage collection categories.
+The Settings page allows users to create and manage custom collection categories.
+
 Users can:
 
-- Create unlimited categories
-- Define custom prompts for each category
-- Select input types for prompts
-- Save category configurations
-- Store category settings as JSON files
-- Category configurations are stored on the server in:
-```
-Server/
-└── settings/
-    └── *.json
+* Create unlimited categories
+* Define custom prompts for each category
+* Edit existing categories
+* Delete prompt fields
+* Add new prompt fields to existing categories
+* Configure camera settings
+* Configure Roboflow integration
+* Save category configurations
+
+Category configurations are stored as JSON files on the server.
+
+```text
+settings/
+├── Vegetables.json
+├── Soil_Moisture.json
+├── Plant_Health.json
+└── ...
 ```
 
-<img src= "Assets/new_image2.png" height= "500" width= "700">
-
+<img src="Assets/new_image2.png" height="500" width="700">
 
 ---
-### Dynamic Data Collection
-collection forms are automatically generated from the selected category settings.
+
+## Dynamic Form Generation
+
+Collection forms are generated automatically from each category's configuration.
 
 Supported prompt types include:
-- Text Box
-- Number Input
-- Date Input
-- Dropdown Selection
-- Text Area
-- Additional custom prompt types
 
-Users can:
-- Select a category
-- omplete category-specific prompts
-- Upload sample images
-- Submit sample data
+* Text Box
+* Text Area (multi-line)
+* Number Input
+* Dropdown List
+* Radio Button
+* Slider
+
+Validation is performed to ensure proper prompt configuration before categories can be saved.
 
 ---
-### Roboflow Integration
-The Settings page includes optional integration with Roboflow.
 
-When creating or editing a category, users can choose to enable Roboflow integration. If enabled, the application prompts the user to enter:
-- Roboflow API Key
-- Workspace Name
-- Project ID
+## Data Collection
 
-These settings are stored within the category's configuration file and can be used by future application features that interact with Roboflow services.
+Users can:
 
+* Select a collection category
+* Complete category-specific forms
+* Capture images directly from their browser
+* Attach multiple images to a single sample
+* Submit metadata and images together
 
+Each submission automatically receives a unique Sample ID.
 
-## Image Storage
+---
 
-Images are stored by sample and type:
+## Image Management
+
+Images are organized by category and sample ID.
 
 ```text
 images/
-├── vegetables/
+├── Category_A/
 │   └── sample_id/
+│       ├── image_1.jpg
+│       ├── image_2.jpg
+│       └── ...
 │
-└── soils/
+└── Category_B/
     └── sample_id/
 ```
 
-Each image is assigned a unique image ID and linked to a `sample_id`.
+Each image receives a unique Image ID and is linked to its associated sample.
 
 ---
-### Data Viewing
-The View Data page allows users to browse and filter collected information.
 
-Users can:
-- Filter by category
-- Filter by collection date
-- View sample IDs
-- View image IDs
-- View collected prompt information
-- Browse stored sample records
-- Download Images
+## Roboflow Integration
+
+The platform includes optional Roboflow integration.
+
+When enabled for a category, users can configure:
+
+* Roboflow API Key
+* Workspace Name
+* Project ID
+
+The application validates credentials before saving.
+
+During sample submission:
+
+* Images are automatically uploaded to Roboflow
+* Metadata is attached to each uploaded image
+* Metadata includes Sample IDs and collected form responses
+
+This allows datasets collected through the platform to be synchronized directly with Roboflow projects.
+
 ---
 
-## Installation
+## Data Viewing
 
-### Clone Repository
+The View Collections page allows users to browse and review collected data.
+
+Features include:
+
+* Category selection
+* Date range filtering
+* Viewing sample information
+* Viewing collected form responses
+* Viewing all images associated with a sample
+* Downloading individual images
+
+Collected records are displayed in expandable sections for easier navigation.
+
+---
+
+# Database Structure
+
+MongoDB stores sample information and image metadata.
+
+Database:
+
+```text
+Collections
+```
+
+Collections:
+
+```text
+Collections
+├── images
+├── category_1
+├── category_2
+├── category_3
+└── ...
+```
+
+Each category created through the Settings page becomes its own MongoDB collection.
+
+---
+
+# Installation
+
+## Clone Repository
 
 ```bash
 git clone <repository-url>
 cd project
 ```
 
-### Create Virtual Environment
+## Create Virtual Environment
 
-Mac/Linux:
+### Mac/Linux
 
 ```bash
 python3 -m venv app
 source app/bin/activate
 ```
 
-Windows:
+### Windows
 
 ```bash
 python -m venv app
 app\Scripts\activate
 ```
 
-### Install Dependencies
+## Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -195,47 +266,25 @@ pip install -r requirements.txt
 
 ---
 
-## MongoDB Setup
+# MongoDB Setup
 
 Install MongoDB and start the service.
 
-Verify it is running:
+Verify installation:
 
 ```bash
 mongosh
 ```
 
-### Database Configuration
+MongoDB runs locally by default at:
 
-MongoDB is configured in:
-
-```python
-# Server/db.py
-
-from pymongo import MongoClient
-
-client = MongoClient("mongodb://localhost:27017")
-
-db = client["Collections"]
-
-vegetable_collections = db["vegetable"]
-soil_collections = db["soil"]
-image_collections = db["images"]
+```text
+mongodb://localhost:27017
 ```
-
-### Database Name
-
-* Collections
-
-### Collections
-
-* vegetable
-* soil
-* images
 
 ---
 
-## Running the Server (FastAPI)
+# Running the Backend Server
 
 Navigate to the Server directory:
 
@@ -243,39 +292,36 @@ Navigate to the Server directory:
 cd Server
 ```
 
-Start the server:
+Start FastAPI:
 
 ```bash
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-Server runs at:
+Backend URL:
 
-```
+```text
 http://127.0.0.1:8000
 ```
----
-## Exposing Backend (ngrok)
-Because the frontend runs on a different machine, the backend is exposed using ngrok.
 
-Start tunnel:
+---
+
+# Optional: Exposing the Backend with ngrok
+
+If the frontend and backend run on different machines, expose the backend using ngrok:
+
 ```bash
 ngrok http 8000
 ```
-Example output:
-```
+
+Example:
+
+```text
 Forwarding https://xxxx.ngrok-free.app -> http://localhost:8000
-
 ```
 
-Note: The ngrok URL changes whenever the tunnel is restarted. Update `UI/key.py` with the new URL before running the Streamlit application.
+Update the frontend URL in:
 
----
-
-## UI Configuration
-The Streamlit UI connects to the server using:
-
-Update Streamlit configuration:
 ```python
 # UI/key.py
 
@@ -284,69 +330,91 @@ URL = "https://xxxx.ngrok-free.app"
 
 ---
 
-## Running the Streamlit UI
+# Running the Streamlit Frontend
 
-Navigate to UI directory:
+Navigate to the UI directory:
 
 ```bash
 cd UI
+```
+
+Run Streamlit:
+
+```bash
 streamlit run home.py
 ```
 
-UI runs at:
+Frontend URL:
 
-```
+```text
 http://localhost:8501
 ```
 
 ---
 
-## API Endpoints
+# API Endpoints
 
-### Create Vegetable Sample
+## Category Configuration
 
-```
-POST /vegetables
-```
+### Get Available Categories
 
-### Create Soil Sample
-
-```
-POST /soils
+```http
+GET /home
 ```
 
-### Upload Image
+### Get Category Configuration
 
+```http
+GET /settings/{category}
 ```
-POST /images
-```
 
-Form Data:
+### Create or Update Category Configuration
 
-* sample_id
-* mode (vegetable | soil)
-* file
-
----
-
-### Get All Data
-
-```
-GET /data
+```http
+POST /settings
 ```
 
 ---
 
-## Future Improvements
+## Sample Management
 
-* Remote camera integration
-* Data analytics dashboard
-* Automated plant health detection
-* Machine learning image classification
+### Create Sample Submission
+
+```http
+POST /collection/submission
+```
+
+### Upload Sample Image
+
+```http
+POST /collection/images/upload
+```
+
+### Retrieve Samples for a Category
+
+```http
+GET /collection/samples/{category}
+```
 
 ---
 
-## Author
+## Image Management
+
+### Retrieve Images for a Sample
+
+```http
+GET /collection/images/{sample_id}
+```
+
+### Retrieve a Specific Image
+
+```http
+GET /collection/image/{image_id}
+```
+
+---
+
+
+# Author
 
 Yarely Torres
-
