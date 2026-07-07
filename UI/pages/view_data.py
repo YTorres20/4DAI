@@ -59,7 +59,7 @@ for sample in samples:
             for question, answer in sample_information.items():
                 st.write(f"**{question}:** {answer}")
 
-                images_list = requests.get(f"{URL}/collection/images/{sample_id}").json()
+            images_list = requests.get(f"{URL}/collection/images/{sample_id}").json()
 
                 
             st.write("## Captured Images")
