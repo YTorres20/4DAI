@@ -26,3 +26,6 @@ images/
 .env
 
 settings/
+
+roboflow_settings/
+

@@ -40,7 +40,9 @@ home_page = st.Page(show_home_dashboard, title="Home", icon="🏠", default=True
 collection_page = st.Page("pages/collection.py", title="Collection Form", visibility="hidden")
 view_data_page = st.Page("pages/view_data.py", title="View Collections", icon="📊")
 settings_page = st.Page("pages/settings.py", title="Settings Manager", icon="⚙️")
+roboflow = st.Page("pages/roboflow.py", title= "RoboFlow", icon="🎯")
+google_collab = st.Page("pages/googleCollab.py", title= "Google Collab",icon="🚀")
 
 # Render sidebar navigation tree
-pg = st.navigation([home_page, view_data_page, settings_page,collection_page])
+pg = st.navigation([home_page, view_data_page, settings_page,collection_page,roboflow,google_collab])
 pg.run()

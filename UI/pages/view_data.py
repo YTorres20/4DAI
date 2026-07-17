@@ -25,7 +25,7 @@ if samples_response.status_code != 200:
 samples = samples_response.json()
 
 if not samples:
-    st.info(f"No submissions found for {selection} yet.")
+    st.info(f"No submissions found for {selection}.")
     st.stop()
 
 st.header("Filter")
@@ -37,7 +37,6 @@ date_range = st.date_input(
     max_value=today
 )
 
-matching_samples_found = False
 
 for sample in samples:
     sample_id = sample["sample_id"]
@@ -47,7 +46,6 @@ for sample in samples:
     except (ValueError, TypeError):
         sample_date = None 
 
-    matching_samples_found = True 
     sample_information = sample["data"]
 
     if isinstance(date_range, tuple) and len(date_range) == 2:

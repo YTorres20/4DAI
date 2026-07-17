@@ -5,3 +5,4 @@ streamlit
 requests
 python-multipart
 pandas
+roboflow

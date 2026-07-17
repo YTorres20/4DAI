@@ -103,7 +103,7 @@ if st.button("Submit"):
                 project_id = roboflow_settings["project_id"]
                 roboflow_URL = f"https://api.roboflow.com/dataset/{project_id}/upload"
 
-                image_information = {"sample_id": sample_id}
+               
                 image_information.update(values)
                 params = {
                     "api_key":roboflow_settings["api_key"],
@@ -122,6 +122,7 @@ if st.button("Submit"):
                     "name": f"{category}:Image ID:{image_id}",
                     "metadata": json.dumps(image_information)
                 }
+                
                 files ={
                     "file":image
                 }
