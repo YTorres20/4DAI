@@ -11,6 +11,8 @@ client = MongoClient("mongodb://localhost:27017")
 db = client["Collections"]
 settings_folder = "settings"
 os.makedirs(settings_folder,exist_ok=True)
+roboflow_folder = "roboflow_settings"
+os.makedirs(roboflow_folder, exist_ok=True)
 
 @app.post("/collection/submission")
 def submission(submission:dict):
@@ -87,6 +89,7 @@ def get_image(image_id:str):
 
   if image is None or not os.path.exists(image["image_path"]):
     return {"error": "IMAGE NOT FOUND"}
+  
   return FileResponse(path=image["image_path"])
 
 @app.get("/collection/images/{sample_id}")
@@ -114,4 +117,28 @@ def create_page_configuration(page:dict):
         json.dump(page,infile,indent=4)
 
     return {"message": "saved", "file": file_path}
-   
+
+@app.post("/roboflow")
+def create_roboflow_home_configuration(roboflow:dict):
+    setting_name = roboflow["name"]
+
+    with open(f"{roboflow_folder}/{setting_name}.json", "w") as infile:
+        json.dump(roboflow,infile,indent=4)
+
+    return{"message":"saved"}
+
+@app.get("/roboflow")
+def get_roboflow_configuration():
+    roboflow_settings = []
+
+    for file_name in os.listdir(roboflow_folder):
+        roboflow_settings.append(file_name.removesuffix(".json"))
+
+    return roboflow_settings
+
+@app.get("/roboflow/{selection}")
+def get_roboflow_configuration(selection:str):
+    
+    with open(f"{roboflow_folder}/{selection}.json") as infile:
+        roboflow_settings = json.load(infile)
+    return roboflow_settings
