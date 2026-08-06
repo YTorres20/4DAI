@@ -5,6 +5,45 @@ from datetime import date
 import re 
 import json 
 
+# =========================================================================
+# ACCESS CONTROL & ROLE CHECKING
+# =========================================================================
+user_obj = getattr(st, "user", None) or getattr(st, "experimental_user", None)
+is_logged_in = user_obj and getattr(user_obj, "is_logged_in", False)
+
+if not is_logged_in:
+  st.warning(
+      "🔒 Please sign in with Google from the Home page to access this"
+      " collection workspace."
+  )
+  if st.button("⬅️ Return to Home"):
+    st.switch_page("UI/home.py")
+  st.stop()
+
+# Fetch backend roles
+try:
+  roles = requests.get(f"{URL}/roles").json()
+except Exception:
+  roles = {}
+
+user_email = getattr(user_obj, "email", "")
+
+# Define individual role memberships
+is_admin = user_email in roles.get("admin", [])
+is_dev = user_email in roles.get("developer", [])
+is_collector = user_email in roles.get("collector", [])
+
+# ENFORCE ACCESS: Change this condition if you want to restrict to specific roles only
+# Right now, it allows Admins, Developers, and Data Collectors.
+if not (is_admin or is_dev or is_collector):
+  st.error(
+      f"⛔ Access Denied: Your email (**{user_email}**) is not authorized to"
+      " access collection forms."
+  )
+  if st.button("🚪 Logout"):
+    st.logout()
+  st.stop()
+
 category = st.session_state.category 
 st.header(f"{category} Collection")
 

@@ -142,3 +142,81 @@ def get_roboflow_configuration(selection:str):
     with open(f"{roboflow_folder}/{selection}.json") as infile:
         roboflow_settings = json.load(infile)
     return roboflow_settings
+
+@app.get("/roles")
+def get_roles():
+    with open("roles.json") as infile:
+        roles = json.load(infile)
+    return roles 
+
+@app.post("/request")
+def request(request:dict):
+    with open("requests.json","a+") as infile:
+        infile.seek(0)
+        try:
+            request_data = json.load(infile)
+        except json.JSONDecodeError:
+            request_data = []
+        
+    if not request_data:
+        request_data = []
+    
+    request_data.append(request)
+    with open("requests.json", "w") as infile:
+        json.dump(request_data,infile,indent=4)
+
+    return {"message": "saved"}
+
+@app.get("/requests")
+def get_requests():
+    with open("requests.json","a+") as infile:
+        infile.seek(0)
+        requests = json.load(infile)
+    return requests 
+
+@app.post("/roles/assign")
+def assign_roles(new_person:dict):
+    with open("roles.json") as infile:
+        roles_data = json.load(infile)
+
+    new_email = new_person["email"]
+    new_role = new_person["role"]
+
+    roles_data[new_role].append(new_email)
+
+    with open ("roles.json", "w" ) as infile:
+        json.dump(roles_data,infile, indent=4)
+
+    return {"status": "success"}
+
+@app.delete("/requests/remove")
+def remove_request(payload: dict):
+    target_email = payload.get("email")
+
+    with open("requests.json", "r") as infile:
+        requests_list = json.load(infile)
+
+    requests_list = [request for request in requests_list if request["email"] != target_email]
+
+    with open("requests.json", "w") as infile:
+        json.dump(requests_list, infile, indent=4)
+
+    return {"status": "success"}
+
+@app.delete("/roles/remove")
+def remove_role_assignment(payload: dict):
+  target_email = payload.get("email")
+  target_role = payload.get("role")
+
+  with open("roles.json", "r") as infile:
+    roles_data = json.load(infile)
+
+  if target_role in roles_data and target_email in roles_data[target_role]:
+    roles_data[target_role].remove(target_email)
+
+    with open("roles.json", "w") as infile:
+      json.dump(roles_data, infile, indent=4)
+
+    return {"status": "success"}
+
+  return {"status": "error", "message": "Role or email not found"}

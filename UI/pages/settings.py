@@ -3,6 +3,40 @@ from key import URL
 import requests 
 import time 
 
+# =========================================================================
+# ACCESS CONTROL & ADMIN/DEVELOPER ROLE VERIFICATION
+# =========================================================================
+user_obj = getattr(st, "user", None) or getattr(st, "experimental_user", None)
+is_logged_in = user_obj and getattr(user_obj, "is_logged_in", False)
+
+if not is_logged_in:
+  st.warning(
+      "🔒 Please sign in with Google from the Home page to access the admin"
+      " panel."
+  )
+  st.stop()
+
+# Fetch backend roles
+try:
+  roles = requests.get(f"{URL}/roles").json()
+except Exception:
+  roles = {}
+
+user_email = getattr(user_obj, "email", "")
+is_admin = user_email in roles.get("admin", [])
+
+# ENFORCE ACCESS: Role requests review is strictly restricted to Admins
+if not is_admin:
+  st.error(
+      f"⛔ Access Denied: Your email (**{user_email}**) is not authorized to"
+      " view role requests. Administrator privileges are required."
+  )
+  st.stop()
+
+# =========================================================================
+# MAIN SETTINGS MANAGER
+# =========================================================================
+
 st.title ("Settings")
 st.divider()
 st.subheader("Add Category")
@@ -477,3 +511,113 @@ if existing_categories:
                         st.error(f"Failed to append. Server rejected with code: {response.status_code}")
                 except Exception as e:
                     st.error(f"Network error trying to append: {str(e)}")
+
+st.title("Role Requests")
+st.divider()
+
+# Fetch pending requests from backend
+try:
+  requests_response = requests.get(f"{URL}/requests")
+  pending_requests = (
+      requests_response.json() if requests_response.status_code == 200 else []
+  )
+except Exception:
+  pending_requests = []
+
+if not pending_requests:
+  st.info("No pending role requests found.")
+else:
+  st.subheader(f"Pending Requests ({len(pending_requests)})")
+
+  for index, req in enumerate(pending_requests):
+    req_email = req.get("email", "Unknown Email")
+    req_name = req.get("name", "Unknown")
+    req_reason = req.get("reason", "No reason provided.")
+    req_date = req.get("date", "Unknown")
+
+    with st.expander(f"Request from: {req_email} -> Name: {req_name}"):
+      st.write(f"**Email:** {req_email}")
+      st.write(f"**Name:** {req_name}")
+      st.write(f"**Reason / Notes:** {req_reason}")
+      st.write(f"**Date:** {req_date}")
+
+      available_roles = ["admin", "developer", "collector"]
+      selected_role = st.selectbox(
+          "Assign Role:",
+          available_roles,
+          key=f"role_select_{index}_{req_email}",
+      )
+
+      col1, col2 = st.columns(2)
+
+      with col1:
+        if st.button("Approve & Assign", key=f"approve_{index}_{req_email}"):
+          payload = {"email": req_email, "role": selected_role}
+          res = requests.post(f"{URL}/roles/assign", json=payload)
+
+          if res.status_code in [200, 201]:
+            requests.delete(f"{URL}/requests/remove", json={"email": req_email})
+            st.success(
+                f"Successfully approved {req_email} for role '{selected_role}'!"
+            )
+            st.rerun()
+          else:
+            st.error("Failed to approve request on the backend.")
+
+      with col2:
+        if st.button("Dismiss / Reject", key=f"reject_{index}_{req_email}"):
+          payload = {"email": req_email}
+          res = requests.delete(f"{URL}/requests/remove", json=payload)
+
+          if res.status_code in [200, 201]:
+            st.warning(f"Dismissed request for {req_email}.")
+            st.rerun()
+          else:
+            st.error("Failed to dismiss request.")
+    
+st.divider()
+st.title("Edit Roles")
+st.divider()
+
+st.subheader("Manage User Roles")
+
+try:
+  roles_response = requests.get(f"{URL}/roles")
+  roles = (
+      roles_response.json() if roles_response.status_code == 200 else {}
+  )
+except Exception:
+  roles = {}
+
+if not roles:
+  st.info("No roles or assignments found.")
+else:
+  # Assuming roles is a dictionary like: {"Admin": ["user@test.com"], "User": [...]}
+  for role_name, users in roles.items():
+    st.write(f"### Role: `{role_name}`")
+
+    if not users:
+      st.write("_No users assigned to this role._")
+    else:
+      for user_email in users:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+          st.write(f"• {user_email}")
+        with col2:
+          # Delete / Revoke button for each user under this role
+          if st.button("Delete", key=f"del_{role_name}_{user_email}"):
+            payload = {"email": user_email, "role": role_name}
+            delete_response = requests.delete(
+                f"{URL}/roles/remove", json=payload
+            )
+
+            if delete_response.status_code == 200:
+              st.success(f"Removed {user_email} from {role_name}")
+              st.rerun()
+            else:
+              st.error("Failed to remove user.")
+
+    st.divider()
+
+
+    

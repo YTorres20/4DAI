@@ -1,3 +1,4 @@
+from datetime import date
 import requests
 import streamlit as st
 from key import URL
@@ -7,9 +8,6 @@ st.set_page_config(
     page_title="Collections Dashboard", page_icon="📊", layout="wide"
 )
 
-# =========================================================================
-# PROFESSIONAL ENTERPRISE CUSTOM CSS STYLING
-# =========================================================================
 st.markdown(
     """
     <style>
@@ -36,6 +34,99 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+roles = requests.get(f"{URL}/roles").json()
+if not roles:
+  st.warning("no roles have been assigned")
+  st.stop()
+
+
+@st.dialog("🔒 Authentication Required")
+def login_dialog():
+  st.warning("Please sign in with Google to access collections and workspaces.")
+  if st.button("🔵 Sign in with Google", type="primary", use_container_width=True):
+    try:
+      st.login()
+    except Exception as e:
+      st.error(f"Login failed: {e}")
+  st.stop()
+
+
+@st.dialog("⚠️ Access Request Required")
+def request_access_dialog(user_email, user_name):
+  st.warning(f"Your email (**{user_email}**) is not registered in the system.")
+  st.markdown(
+      "You need permissions from an administrator to access protected pages"
+      " and collections. You can send a request below."
+  )
+
+  # Check if request was already sent in session state
+  if "request_sent" not in st.session_state:
+    st.session_state.request_sent = False
+
+  if st.session_state.request_sent:
+    st.success(
+        "✅ Access request sent successfully! An administrator will review it."
+    )
+    if st.button("🚪 Logout", use_container_width=True):
+      st.logout()
+    st.stop()
+
+  reason = st.text_area(
+      "Reason for request (optional):",
+      placeholder="Explain why you need access...",
+  )
+
+  if st.button(
+      "📩 Send Access Request", type="primary", use_container_width=True
+  ):
+    payload = {
+        "name": user_name,
+        "email": user_email,
+        "reason": reason,
+        "date": str(date.today()),
+    }
+    try:
+      resp = requests.post(f"{URL}/request", json=payload)
+      if resp.status_code in [200, 201]:
+        st.session_state.request_sent = True
+        st.rerun()
+      else:
+        st.error(f"Failed to submit request. Server error: {resp.status_code}")
+    except Exception as e:
+      st.error(f"Network error while sending request: {e}")
+
+  if st.button("🚪 Logout", use_container_width=True):
+    st.logout()
+
+  st.stop()
+
+
+def check_user_access():
+  """Safely checks login status and matches email against backend /roles."""
+  user_obj = getattr(st, "user", None) or getattr(
+      st, "experimental_user", None
+  )
+
+  if not user_obj or not getattr(user_obj, "is_logged_in", False):
+    login_dialog()
+
+  user_email = getattr(user_obj, "email", "")
+  user_name = getattr(user_obj, "name", "Unknown User")
+
+  # Check if user exists in any role category
+  is_admin = user_email in roles.get("admin", [])
+  is_dev = user_email in roles.get("developer", [])
+  is_collector = user_email in roles.get("collector", [])
+
+  if is_admin:
+    return "Admin"
+  elif is_dev:
+    return "Developer"
+  elif is_collector:
+    return "Data Collector"
+  else:
+    request_access_dialog(user_email, user_name)
+
 
 # =========================================================================
 # 1. MAIN DASHBOARD CONTENT VIEW
@@ -45,29 +136,83 @@ st.markdown(
 def show_home_dashboard():
   st.session_state.category = None
 
-  # Enterprise Header Section with Global Shortcuts (#3)
+  user_obj = getattr(st, "user", None) or getattr(
+      st, "experimental_user", None
+  )
+  is_logged_in = user_obj and getattr(user_obj, "is_logged_in", False)
+  user_name = getattr(user_obj, "user_name", None) or getattr(
+      user_obj, "name", "Guest"
+  )
+  user_email = getattr(user_obj, "email", "")
+
+  # Sidebar Profile & Logout / Login Section (Always visible)
+  with st.sidebar:
+    st.subheader("Account")
+    if is_logged_in:
+      st.markdown(f"Signed in as:\n**{user_name}**")
+      if user_email:
+        st.caption(user_email)
+      if st.button("🚪 Logout", use_container_width=True):
+        st.logout()
+    else:
+      st.write("You are currently not signed in.")
+      if st.button(
+          "🔵 Sign in with Google", type="primary", use_container_width=True
+      ):
+        try:
+          st.login()
+        except Exception as e:
+          st.error(f"Login failed: {e}")
+    st.divider()
+
   col_title, col_actions = st.columns([2, 1])
   with col_title:
     st.title("Collections Overview")
-    st.markdown(
-        "<p style='color: #6B7280; margin-top: -10px;'>Select a database"
-        " collection below to open its specific management form.</p>",
-        unsafe_allow_html=True,
-    )
+    if is_logged_in:
+      st.markdown(
+          f"<p style='color: #6B7280; margin-top: -10px;'>Welcome back,"
+          f" <b>{user_name}</b></p>",
+          unsafe_allow_html=True,
+      )
+    else:
+      st.markdown(
+          "<p style='color: #6B7280; margin-top: -10px;'>Select a database"
+          " collection below to open its specific management form.</p>",
+          unsafe_allow_html=True,
+      )
 
   with col_actions:
     st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
-    # Quick shortcuts to jump straight to core app sections
     col_a, col_b, col_c = st.columns(3)
+
     with col_a:
       if st.button("📊 View"):
-        st.switch_page(view_data_page)
+        if not is_logged_in:
+          login_dialog()
+        else:
+          role = check_user_access()
+          if role:
+            st.switch_page(view_data_page)
+
     with col_b:
       if st.button("🎯 Robo"):
-        st.switch_page(roboflow)
+        if not is_logged_in:
+          login_dialog()
+        else:
+          role = check_user_access()
+          if role:
+            st.switch_page(roboflow)
+
     with col_c:
       if st.button("⚙️ Config"):
-        st.switch_page(settings_page)
+        if not is_logged_in:
+          login_dialog()
+        else:
+          role = check_user_access()
+          if role in ["Admin", "Developer"]:
+            st.switch_page(settings_page)
+          else:
+            st.error("Access Denied: Config is restricted to Admins & Developers.")
 
   try:
     response = requests.get(f"{URL}/home")
@@ -80,10 +225,8 @@ def show_home_dashboard():
     st.stop()
 
   total_categories = len(categories)
-
   st.markdown("---")
 
-  # Search and Sorting Toolbar controls (#1)
   filter_col, sort_col = st.columns([3, 1])
   with filter_col:
     search_query = st.text_input(
@@ -98,15 +241,11 @@ def show_home_dashboard():
         label_visibility="collapsed",
     )
 
-  # Apply Sorting
   categories.sort(reverse=(sort_order == "Reverse (Z-A)"))
-
-  # Filter categories based on search input
   filtered_categories = [
       cat for cat in categories if search_query.lower() in cat.lower()
   ]
 
-  # Dynamic Metrics Row
   m1, m2, m3 = st.columns(3)
   with m1:
     st.metric(label="Total Database Collections", value=total_categories)
@@ -125,7 +264,6 @@ def show_home_dashboard():
     st.info("No matching collections found.")
     st.stop()
 
-  # Professional 3-Column Grid Layout
   GRID_COLUMNS = 3
   rows = [
       filtered_categories[i : i + GRID_COLUMNS]
@@ -147,8 +285,13 @@ def show_home_dashboard():
           if st.button(
               f"Open {category_name} Collection", key=f"btn_prof_{category_name}"
           ):
-            st.session_state.category = category_name
-            st.switch_page(collection_page)
+            if not is_logged_in:
+              login_dialog()
+            else:
+              role = check_user_access()
+              if role:
+                st.session_state.category = category_name
+                st.switch_page(collection_page)
 
 
 # =========================================================================
@@ -166,7 +309,7 @@ settings_page = st.Page("pages/settings.py", title="Settings Manager", icon="⚙
 roboflow = st.Page("pages/roboflow.py", title="RoboFlow", icon="🎯")
 google_collab = st.Page("pages/googleCollab.py", title="Google Collab", icon="🚀")
 
-pg = st.navigation([
+active_page = st.navigation([
     home_page,
     view_data_page,
     settings_page,
@@ -174,4 +317,10 @@ pg = st.navigation([
     roboflow,
     google_collab,
 ])
-pg.run()
+
+user_obj = getattr(st, "user", None) or getattr(st, "experimental_user", None)
+is_logged_in = user_obj and getattr(user_obj, "is_logged_in", False)
+
+if active_page.title != "Home" and not is_logged_in:
+  login_dialog()
+active_page.run()
