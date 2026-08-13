@@ -34,9 +34,29 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-roles = requests.get(f"{URL}/roles").json()
+# =========================================================================
+# SERVER OFFLINE & HEALTH CHECK
+# =========================================================================
+try:
+  roles_response = requests.get(f"{URL}/roles", timeout=5)
+  if roles_response.status_code == 200:
+    roles = roles_response.json()
+  else:
+    roles = {}
+except Exception:
+  roles = {}
+
 if not roles:
-  st.warning("no roles have been assigned")
+  st.error("🚨 **System Offline / Server Unreachable**")
+  st.warning(
+      "We are currently unable to connect to the backend server. All database"
+      " collections, workflows, and administrative features are temporarily"
+      " locked until connection is restored."
+  )
+  st.info(
+      "Please check your network connection or try again later. If the issue"
+      " persists, contact your system administrator."
+  )
   st.stop()
 
 
@@ -59,7 +79,6 @@ def request_access_dialog(user_email, user_name):
       " and collections. You can send a request below."
   )
 
-  # Check if request was already sent in session state
   if "request_sent" not in st.session_state:
     st.session_state.request_sent = False
 
@@ -113,7 +132,6 @@ def check_user_access():
   user_email = getattr(user_obj, "email", "")
   user_name = getattr(user_obj, "name", "Unknown User")
 
-  # Check if user exists in any role category
   is_admin = user_email in roles.get("admin", [])
   is_dev = user_email in roles.get("developer", [])
   is_collector = user_email in roles.get("collector", [])
@@ -145,28 +163,11 @@ def show_home_dashboard():
   )
   user_email = getattr(user_obj, "email", "")
 
-  # Sidebar Profile & Logout / Login Section (Always visible)
-  with st.sidebar:
-    st.subheader("Account")
-    if is_logged_in:
-      st.markdown(f"Signed in as:\n**{user_name}**")
-      if user_email:
-        st.caption(user_email)
-      if st.button("🚪 Logout", use_container_width=True):
-        st.logout()
-    else:
-      st.write("You are currently not signed in.")
-      if st.button(
-          "🔵 Sign in with Google", type="primary", use_container_width=True
-      ):
-        try:
-          st.login()
-        except Exception as e:
-          st.error(f"Login failed: {e}")
-    st.divider()
-
-  col_title, col_actions = st.columns([2, 1])
-  with col_title:
+  # =========================================================================
+  # MODERN TOP-RIGHT HEADER & ACCOUNT TOOLBAR
+  # =========================================================================
+  top_col1, top_col2 = st.columns([3, 1])
+  with top_col1:
     st.title("Collections Overview")
     if is_logged_in:
       st.markdown(
@@ -181,9 +182,32 @@ def show_home_dashboard():
           unsafe_allow_html=True,
       )
 
-  with col_actions:
-    st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
-    col_a, col_b, col_c = st.columns(3)
+  with top_col2:
+    with st.container():
+      if is_logged_in:
+        st.markdown(
+            f"<div style='text-align: right; font-size: 0.85rem; color: #374151;"
+            f" line-height: 1.2;'><b>{user_name}</b><br><span"
+            f" style='color: #6B7280; font-size: 0.75rem;'>{user_email}</span></div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("🚪 Logout", key="top_logout_btn"):
+          for key in list(st.session_state.keys()):
+            del st.session_state[key]
+          st.logout()
+      else:
+        if st.button("🔵 Sign in with Google", key="top_login_btn", type="primary"):
+          try:
+            st.login()
+          except Exception as e:
+            st.error(f"Login failed: {e}")
+
+  st.divider()
+
+  # Quick action buttons row
+  col_actions_space, col_actions = st.columns([2, 1])
+  with col_actions_space:
+    col_a, col_b, col_c, col_d = st.columns(4)
 
     with col_a:
       if st.button("📊 View"):
@@ -213,6 +237,15 @@ def show_home_dashboard():
             st.switch_page(settings_page)
           else:
             st.error("Access Denied: Config is restricted to Admins & Developers.")
+    with col_d:
+      if st.button("🚀 Google"):
+        if not is_logged_in:
+          login_dialog()
+        else:
+          role = check_user_access()
+          if role:
+            st.switch_page(google_collab)
+        
 
   try:
     response = requests.get(f"{URL}/home")
@@ -309,6 +342,9 @@ settings_page = st.Page("pages/settings.py", title="Settings Manager", icon="⚙
 roboflow = st.Page("pages/roboflow.py", title="RoboFlow", icon="🎯")
 google_collab = st.Page("pages/googleCollab.py", title="Google Collab", icon="🚀")
 
+# 🛠️ ADDED DEVELOPER LAB PAGE HERE
+developer_lab_page = st.Page("pages/developer_lab.py", title="Developer Lab", icon="🛠️")
+
 active_page = st.navigation([
     home_page,
     view_data_page,
@@ -316,6 +352,7 @@ active_page = st.navigation([
     collection_page,
     roboflow,
     google_collab,
+    developer_lab_page,  # <--- Registered in navigation
 ])
 
 user_obj = getattr(st, "user", None) or getattr(st, "experimental_user", None)

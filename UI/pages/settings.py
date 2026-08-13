@@ -1,7 +1,10 @@
-import streamlit as st 
-from key import URL 
-import requests 
-import time 
+from datetime import datetime
+import json
+import re
+import time
+from key import URL
+import requests
+import streamlit as st
 
 # =========================================================================
 # ACCESS CONTROL & ADMIN/DEVELOPER ROLE VERIFICATION
@@ -11,8 +14,7 @@ is_logged_in = user_obj and getattr(user_obj, "is_logged_in", False)
 
 if not is_logged_in:
   st.warning(
-      "🔒 Please sign in with Google from the Home page to access the admin"
-      " panel."
+      "🔒 Please sign in with Google from the Home page to access settings."
   )
   st.stop()
 
@@ -24,139 +26,206 @@ except Exception:
 
 user_email = getattr(user_obj, "email", "")
 is_admin = user_email in roles.get("admin", [])
+is_dev = user_email in roles.get("developer", [])
 
-# ENFORCE ACCESS: Role requests review is strictly restricted to Admins
-if not is_admin:
+# ENFORCE ACCESS: Allow both Admins and Developers to access settings
+if not (is_admin or is_dev):
   st.error(
       f"⛔ Access Denied: Your email (**{user_email}**) is not authorized to"
-      " view role requests. Administrator privileges are required."
+      " view the settings panel."
   )
   st.stop()
+
+# =========================================================================
+# ROLE-BASED HEADER NOTICE
+# =========================================================================
+if is_admin:
+  st.success(
+      "👑 **Administrator View:** You have full access to category management"
+      " and user role administration."
+  )
+elif is_dev:
+  st.info(
+      "🔬 **Developer View:** You have access to category management and field"
+      " configuration. (User role assignments are restricted to administrators)."
+  )
 
 # =========================================================================
 # MAIN SETTINGS MANAGER
 # =========================================================================
 
-st.title ("Settings")
+st.title("Settings")
 st.divider()
+st.subheader("Add New Category")
+
+with st.expander("📖 Instructions: How to Create a Category", expanded=True):
+  st.markdown("""
+    Welcome to the **Category Creator**. Follow these steps to build a custom data collection form:
+    1. **Category Name:** Enter a unique name for your data category (e.g., *Vegetables*, *Fruits*).
+    2. **Add Prompt Fields:** Define fields that data collectors will fill out. Choose how each field appears:
+       - *Text / Text Area:* For open-ended notes or descriptions.
+       - *Number / Slider:* For numerical metrics (requires min/max values).
+       - *Dropdown / Radio:* For selectable options (**must be comma-separated**, e.g., `Fresh, Ripe, Spoiled`).
+    3. **Queue Fields:** Click **Add** after configuring each field to append it to your list below.
+    4. **Configure Hardware & Integration:** Select whether to use a Kinect camera and/or configure automated RoboFlow image uploads.
+    5. **Confirm:** Click **Confirm** at the bottom to publish your new category to the platform!
+    """)
 st.subheader("Add Category")
 
 if "prompts" not in st.session_state:
-    st.session_state.prompts = []
+  st.session_state.prompts = []
 
 if "active_category" not in st.session_state:
-    st.session_state.active_category = ""
+  st.session_state.active_category = ""
 
 if "disable" not in st.session_state:
-    st.session_state.disable = False 
+  st.session_state.disable = False
 
 if "roboflow_settings" not in st.session_state:
-    st.session_state.roboflow_settings = {}
+  st.session_state.roboflow_settings = {}
 
 if "camera_settings" not in st.session_state:
-    st.session_state.camera_settings = False
+  st.session_state.camera_settings = False
 
 if "new_prompts" not in st.session_state:
-    st.session_state.new_prompts = []   
+  st.session_state.new_prompts = []
 
 if "pushed_buttons" not in st.session_state:
-    st.session_state.pushed_buttons = {}
+  st.session_state.pushed_buttons = {}
 
 if len(st.session_state.prompts) > 0:
-    category_name = st.text_input("Category Name:",disabled=True, help= "Clear current prompts or click confrim to change category", value= st.session_state.active_category)
+  category_name = st.text_input(
+      "Category Name:",
+      disabled=True,
+      help="Clear current prompts or click confrim to change category",
+      value=st.session_state.active_category,
+  )
 else:
-    category_name= st.text_input("Category Name:", value=st.session_state.active_category)
+  category_name = st.text_input(
+      "Category Name:", value=st.session_state.active_category
+  )
 
-if len(st.session_state.prompts)== 0:
-    st.session_state.active_category = category_name
+if len(st.session_state.prompts) == 0:
+  st.session_state.active_category = category_name
 
-
-prompt = st.text_input("Add Prompt:",key="make_prompt")
+prompt = st.text_input("Add Prompt:", key="make_prompt")
 selection = st.selectbox(
-                    "How should this field be displayed:",
-                    ["Text Box", 
-                    "Text Area (multi-line)", 
-                    "Number Input", 
-                    "Dropdown List", 
-                    "Radio Button", 
-                    "Slider"],key="make_selection")
-    
-settings = {
-            "selection": selection, 
-            "prompt": prompt 
-            }
-    
-range_error = False 
-validation_error = False 
-        
+    "How should this field be displayed:",
+    [
+        "Text Box",
+        "Text Area (multi-line)",
+        "Number Input",
+        "Dropdown List",
+        "Radio Button",
+        "Slider",
+    ],
+    key="make_selection",
+)
+
+settings = {"selection": selection, "prompt": prompt}
+
+range_error = False
+validation_error = False
+
 if selection == "Number Input" or selection == "Slider":
+  max_value = st.number_input("Enter max value:")
+  min_value = st.number_input("Enter min value:")
 
-    max_value = st.number_input("Enter max value:")
-    min_value = st.number_input("Enter min value:")
+  if max_value <= min_value:
+    range_error = True
+    st.error("Max value must be strictly greater than the Min value.")
 
-    if max_value <= min_value:
-        range_error = True
-        st.error("Max value must be strictly greater than the Min value.")
+  settings["max"] = max_value
+  settings["min"] = min_value
 
-    settings["max"] = max_value
-    settings["min"] = min_value
+elif (
+    selection == "Dropdown List"
+    or selection == "Radio Button"
+    or selection == "Check Box"
+):
+  raw_options = st.text_input("Enter options (comma separated):")
+  cleaned_options = raw_options.replace(".", ",").strip().rstrip(",").strip()
 
-elif selection == "Dropdown List" or selection == "Radio Button" or selection == "Check Box":
-    raw_options = st.text_input("Enter options (comma separated):")
-    cleaned_options = raw_options.replace(".",",").strip().rstrip(",").strip()
-
-    if "," in cleaned_options:
-        settings["options"] = cleaned_options
-    else:
-        st.error(" Validation Error: You must enter at least two options separated by a comma.")
-        validation_error = True
-
+  if "," in cleaned_options:
+    settings["options"] = cleaned_options
+  else:
+    st.error(
+        " Validation Error: You must enter at least two options separated by a"
+        " comma."
+    )
+    validation_error = True
 
 
 if st.button("Add"):
-    if not prompt.strip():
-        st.error("Please enter a name for the prompt before adding.")
-    elif (selection in ["Dropdown List", "Radio Button"]) and not settings.get("options", "").strip():
-        st.error(f"Please enter options for the {selection}.")
-    elif not category_name.strip():
-        st.error("Please enter a name for the Category before adding.")
-    elif range_error:
-        st.error("Cannot save: Please fix the Min/Max range issue first.")
-    elif validation_error:
-        st.error("Cannot save: Please fix options before adding.")
-    else:
-        st.session_state.prompts.append(settings)
-        st.rerun()
+  if not prompt.strip():
+    st.error("Please enter a name for the prompt before adding.")
+  elif (selection in ["Dropdown List", "Radio Button"]) and not settings.get(
+      "options", ""
+  ).strip():
+    st.error(f"Please enter options for the {selection}.")
+  elif not category_name.strip():
+    st.error("Please enter a name for the Category before adding.")
+  elif range_error:
+    st.error("Cannot save: Please fix the Min/Max range issue first.")
+  elif validation_error:
+    st.error("Cannot save: Please fix options before adding.")
+  else:
+    st.session_state.prompts.append(settings)
+    st.rerun()
 
-            
-st.divider()
-
-kinect = st.selectbox("Use of Kinect camera:",["False", "True"],key="kinect_camera")
 
 st.divider()
 
-roboflow = st.selectbox("Enable Automatic Roboflow Upload",["False","True"], key="roboflow")
+kinect = st.selectbox(
+    "Use of Kinect camera:", ["False", "True"], key="kinect_camera"
+)
+
+st.divider()
+st.info(
+    "💡 **Quick Guide: Roboflow in Category Settings vs. The Roboflow"
+    " Workspace**\n\n• **Here (Category Settings):** Configures **automatic,"
+    " background uploads** for a specific category. Any images captured under"
+    " this category are automatically pushed to Roboflow in real-time during"
+    " data collection.\n\n• **Roboflow Workspace Page (`roboflow.py`):** Acts as"
+    " a **manual curation and batch-upload dashboard**. It allows"
+    " administrators and collectors to browse past submissions, filter by"
+    " date, select specific images, and batch-upload them with cleaned form"
+    " metadata."
+)
+
+roboflow = st.selectbox(
+    "Enable Automatic Roboflow Upload", ["False", "True"], key="roboflow"
+)
 
 if roboflow == "True":
-    api_key = st.text_input("Please Input RoboFlow API Key:", type="password", key="api_key")
-    workspace = st.text_input ("Please Input Workspace:", key="workspace")
-    project_id = st.text_input("Please Input Project ID:", key="project_id")
+  api_key = st.text_input(
+      "Please Input RoboFlow API Key:", type="password", key="api_key"
+  )
+  workspace = st.text_input("Please Input Workspace:", key="workspace")
+  project_id = st.text_input("Please Input Project ID:", key="project_id")
 
-    if api_key and workspace and project_id:
-        try:
-            roboflow_response = requests.get(f"https://api.roboflow.com/{workspace}/{project_id}", params={"api_key":api_key})
-        
-            if roboflow_response.status_code == 200:
-                st.success("Credentials verified successfully!")
-                roboflow_settings = {"api_key":api_key, "workspace":workspace, "project_id": project_id}
-            else:
-                st.error("Invalid Credentials")
-                roboflow_settings = False
-        except:
-            st.error("Network Connection Failed.")
-            roboflow_settings = False
+  if api_key and workspace and project_id:
+    try:
+      roboflow_response = requests.get(
+          f"https://api.roboflow.com/{workspace}/{project_id}",
+          params={"api_key": api_key},
+      )
+
+      if roboflow_response.status_code == 200:
+        st.success("Credentials verified successfully!")
+        roboflow_settings = {
+            "api_key": api_key,
+            "workspace": workspace,
+            "project_id": project_id,
+        }
+      else:
+        st.error("Invalid Credentials")
+        roboflow_settings = False
+    except:
+      st.error("Network Connection Failed.")
+      roboflow_settings = False
 else:
-    roboflow_settings = False 
+  roboflow_settings = False
 
 
 st.divider()
@@ -164,460 +233,467 @@ st.divider()
 st.subheader("Current Prompts")
 
 for count, prompt in enumerate(st.session_state.prompts):
-    col1, col2 = st.columns([4,1])
+  col1, col2 = st.columns([4, 1])
 
-    with col1:
-        st.write(f"{count+1}. {prompt}")
+  with col1:
+    st.write(f"{count+1}. {prompt}")
 
-    with col2:
-         if st.button("Delete",key=f"delete_key{count}"):
-            st.session_state.prompts.pop(count)
+  with col2:
+    if st.button("Delete", key=f"delete_key{count}"):
+      st.session_state.prompts.pop(count)
 
 if st.button("Confirm"):
-    clean_category = " ".join(category_name.split())
+  clean_category = " ".join(category_name.split())
 
+  try:
     existing_categories = requests.get(f"{URL}/home").json()
-    
-    if not st.session_state.active_category.strip() or not st.session_state.prompts:
-        st.error("Submission Denied: Category Name cannot be blank")
-        st.error("Submission Denied: You must add at least one prompt field configuring.")
+  except Exception:
+    existing_categories = []
 
-    elif clean_category.lower() in [category.lower() for category in existing_categories]:
+  if not st.session_state.active_category.strip() or not st.session_state.prompts:
+    st.error("Submission Denied: Category Name cannot be blank")
+    st.error(
+        "Submission Denied: You must add at least one prompt field configuring."
+    )
 
-        st.error("Submission Denied: Category already exist")
-        st.info("Please use the Edit Category section below if you wish to modify it.")
+  elif clean_category.lower() in [
+      category.lower() for category in existing_categories
+  ]:
+    st.error("Submission Denied: Category already exist")
+    st.info(
+        "Please use the Edit Category section below if you wish to modify it."
+    )
 
-    else:
-
-        page = {
-        "category" :clean_category,
-        "prompts":[prompt for prompt in st.session_state.prompts],
+  else:
+    page = {
+        "category": clean_category,
+        "prompts": [prompt for prompt in st.session_state.prompts],
         "camera": kinect,
-        "roboflow": roboflow_settings
-
+        "roboflow": roboflow_settings,
     }
 
-        response = requests.post(
-            f"{URL}/settings",
-            json=page
-        )
-        if response.status_code in [200,201]:
+    response = requests.post(f"{URL}/settings", json=page)
+    if response.status_code in [200, 201]:
+      st.session_state.prompts = []
+      st.session_state.active_category = ""
 
-            st.session_state.prompts = []
-            st.session_state.active_category = ""
-
-            # Display your clean confirmation message
-            st.success("The settings have been added and everything is good!")
-            
-            # Wait 2 seconds so they can read the message before st.rerun clears it
-            time.sleep(3)
-
-            st.rerun()
-        else:
-            st.error(f"Server rejected update. Error code: {response.status_code}")
+      st.success("The settings have been added and everything is good!")
+      time.sleep(3)
+      st.rerun()
+    else:
+      st.error(f"Server rejected update. Error code: {response.status_code}")
 
 ####################### Edit category ########################
 
-
 st.divider()
 st.subheader("Edit Category")
-edit = st.fragment
 
-if "new_prompts" not in st.session_state:
-    st.session_state.new_prompts = []   
-
-existing_categories = requests.get(f"{URL}/home").json()
-if not existing_categories:
-        st.stop()
-
-if existing_categories:
-
-    selected_category = st.selectbox("Select the category you wish to edit", existing_categories, key="edit_category")
-
-
-    settings = requests.get(f"{URL}/settings/{selected_category}").json()
-
-   
-
-
-    with st.expander(f"Modify or Delete Existing Fields in: {selected_category}"):
-        st.divider()
-        old_prompts = settings["prompts"]
-
-        st.subheader(f"Editing {settings['category']}")
-
-        available_displays = [
-                "Text Box", 
-                "Text Area (multi-line)", 
-                "Number Input", 
-                "Dropdown List", 
-                "Radio Button", 
-                "Slider"
-            ]
-
-            
-        category_key = settings['category']
-        if category_key not in st.session_state.pushed_buttons:
-            st.session_state.pushed_buttons[category_key] = [False] * len(settings["prompts"])
-
-        @edit()
-        def Editing():
-
-            for count, prompt_item in enumerate(old_prompts):
-                current_selection = prompt_item["selection"]
-                default_index = available_displays.index(current_selection)
-
-                st.markdown(f"**Field #{count+1}**")
-
-                prompt_key = f"{settings['category']}_new_prompt{count}"
-                selection_key = f"{settings['category']}_new_selection{count}"
-
-                # Pull lock state straight from session_state
-                is_disabled = st.session_state.pushed_buttons[category_key][count]
-
-                st.text_input(f"Edit Prompt:", value=prompt_item["prompt"], key=prompt_key, disabled=is_disabled)
-                st.selectbox("How should this field be displayed:", available_displays, index=default_index, key=selection_key, disabled=is_disabled)
-
-                update_prompt = {
-                    "prompt": st.session_state[prompt_key],
-                    "selection": st.session_state[selection_key]
-                }
-                
-                range_error = False 
-                if st.session_state[selection_key] == "Number Input" or st.session_state[selection_key] == "Slider":
-                    default_max = prompt_item.get("max", 10)
-                    default_min = prompt_item.get("min", 0)
-
-                    new_max_val = st.number_input("Enter max value:", key=f"{settings['category']}_new_max_key{count}", value=default_max, disabled=is_disabled)
-                    new_min_val = st.number_input("Enter min value:", key=f"{settings['category']}_new_min_key{count}", value=default_min, disabled=is_disabled)
-
-                    if new_max_val <= new_min_val:
-                        range_error = True 
-                        st.error("Max value must be strictly greater than the Min value.")
-                    
-                    update_prompt["max"] = new_max_val
-                    update_prompt["min"] = new_min_val
-
-                validation_error = False 
-                if st.session_state[selection_key] in ["Dropdown List", "Radio Button", "Check Box"]:
-                    new_raw_options = st.text_input("Enter options (comma separated):", key=f"{settings['category']}_new_options_key{count}", value=prompt_item.get("options", ""), disabled=is_disabled)
-                    new_cleaned_options = new_raw_options.replace(".", ",").strip().rstrip(",").strip()
-
-                    if "," in new_cleaned_options:
-                        update_prompt["options"] = new_cleaned_options
-                    else:
-                        st.error("Validation Error: You must enter at least two options separated by a comma.")
-                        validation_error = True
-
-                cols = st.columns(2)
-
-                with cols[0]:
-                    if st.button("Keep/Update", key=f"keep/update{count}", disabled=is_disabled):
-                        if not update_prompt["prompt"].strip():
-                            st.error("Please enter a name for the prompt before updating.")
-                        elif (st.session_state[selection_key] in ["Dropdown List", "Radio Button"]) and not update_prompt.get("options", "").strip():
-                            st.error(f"Please enter options for the {st.session_state[selection_key]}.")
-                        elif range_error:
-                            st.error("Cannot save: Please fix the Min/Max range issue first.")
-                        elif validation_error:
-                            st.error("Cannot save: Please fix options before updating.")
-                        else:
-                            st.session_state.new_prompts.append(update_prompt)
-                            st.session_state.pushed_buttons[category_key][count] = True
-                            st.rerun(scope="fragment")
-                        
-                with cols[1]:
-                    if st.button("Delete", key=f"delete_prompt{count}", disabled=is_disabled):
-                        st.session_state.pushed_buttons[category_key][count] = True 
-                        st.rerun(scope="fragment")
-                st.divider()
-
-   
-        Editing() 
-
-
-
-        @edit()
-        def Editing_roboflow():
-
-            old_roboflow_settings = settings["roboflow"]
-
-        
-            if old_roboflow_settings == False:
-            
-                if st.button("Turn Off", key="turn_off_roboflow_false", disabled=st.session_state.disable):
-                    st.session_state.roboflow_settings = False 
-                    st.session_state.disable=True
-                    old_roboflow_settings = False
-                    st.rerun(scope="fragment")
-
-
-
-                new_api_key = st.text_input("Please Input RoboFlow API Key:", type="password", key="new_api_key", disabled=st.session_state.disable)
-                new_workspace = st.text_input("Please Input Workspace:", key="new_workspace", disabled=st.session_state.disable)
-                new_project_id = st.text_input("Please Input Project ID:", key="new_project_id", disabled=st.session_state.disable)
-
-                if new_api_key and new_workspace and new_project_id:
-                    try:
-                        roboflow_response = requests.get(f"https://api.roboflow.com/{new_workspace}/{new_project_id}", params={"api_key": new_api_key})
-                    
-                        if roboflow_response.status_code == 200:
-                            st.success("Credentials verified successfully!")
-                            st.session_state.roboflow_settings = {"api_key": new_api_key, "workspace": new_workspace, "project_id": new_project_id}
-                        else:
-                            st.error("Invalid Credentials")
-                            st.session_state.roboflow_settings = False
-                    except:
-                        st.error("Network Connection Failed.")
-                        st.session_state.roboflow_settings = False
-                else:
-                    st.session_state.roboflow_settings = False
-            else:
-
-            
-                if st.button("Turn Off", key="turn_off_roboflow_true", disabled=st.session_state.disable):
-                    roboflow_settings = False 
-                    st.session_state.disable=True
-                    st.session_state.roboflow_settings= False 
-                    st.rerun(scope="fragment")
-
-                new_api_key = st.text_input("Please Input RoboFlow API Key:", type="password", key="new_api_key", value=old_roboflow_settings["api_key"],disabled=st.session_state.disable )
-                new_workspace = st.text_input ("Please Input Workspace:", key="new_workspace", value= old_roboflow_settings["workspace"],disabled=st.session_state.disable)
-                new_project_id = st.text_input("Please Input Project ID:", key="new_project_id", value= old_roboflow_settings["project_id"],disabled=st.session_state.disable)
-
-                if new_api_key and new_workspace and new_project_id:
-                    try:
-                        roboflow_response = requests.get(f"https://api.roboflow.com/{new_workspace}/{new_project_id}", params={"api_key":new_api_key})
-                    
-                        if roboflow_response.status_code == 200:
-                            st.success("Credentials verified successfully!")
-                            st.session_state.roboflow_settings = {"api_key":new_api_key, "workspace":new_workspace, "project_id": new_project_id}
-                        else:
-                            st.error("Invalid Credentials")
-                            st.session_state.roboflow_settings = False
-                    except:
-                        st.error("Network Connection Failed.")
-                        st.session_state.roboflow_settings = False
-                else:
-                    st.session_state.roboflow_settings = False 
-
-            st.divider()
-            st.session_state.camera_settings = st.selectbox("Use of Kinect camera:",["False", "True"] , key="new_camera_settings")
-
-        Editing_roboflow()
-            
-        st.divider()
-
-        clicked = st.button("Confirm Changes")
-
-        if clicked:
-            
-            category_key = settings["category"]
-            all_buttons_pushed = all(st.session_state.pushed_buttons[category_key])
-            
-            if not all_buttons_pushed:
-                st.error("Submission Denied: You must click 'Keep/Update' or 'Delete' on every field before confirming.")
-            elif not st.session_state.new_prompts:
-                st.error("Submission Denied: A category must contain at least one valid prompt field.")
-            else:
-                update_settings = {
-                    "category":settings["category"],
-                    "prompts":[new_prompt for new_prompt in st.session_state.new_prompts],
-                    "camera": st.session_state.camera_settings,
-                    "roboflow" : st.session_state.roboflow_settings
-                }
-                response = requests.post(f"{URL}/settings",json=update_settings)
-
-                if response.status_code in [200,201]:
-                    st.success("Settings have been updated")
-                    st.session_state.camera_settings = False 
-                    st.session_state.roboflow_settings = {}
-                    st.session_state.new_prompts = [] 
-                    st.session_state.pushed_buttons[category_key] = [False] * len(settings["prompts"])
-                    time.sleep(3)
-                    st.rerun()
-                else:
-                    st.error("Error. Changes are not made") 
-                    time.sleep(3) 
-                    st.rerun()
-                
-
-#########################################################################################
-
-    with st.expander(f"Add a New Prompt Field to: {selected_category}"):
-        st.write(f"This will immediately append a new field to the bottom of the **{selected_category}** category.")
-
-        new_field_prompt = st.text_input("New Prompt Name:", key=f"{selected_category}_standalone_add_prompt")
-        new_field_selection = st.selectbox(
-                "Display Style:",
-                ["Text Box", "Text Area (multi-line)", "Number Input", "Dropdown List", "Radio Button", "Slider"],
-                key=f"{selected_category}_standalone_add_selection"
-            )
-
-        extra_settings = {"prompt": new_field_prompt, "selection": new_field_selection}
-        new_range_error = False 
-        new_validation_error = False
-
-        if new_field_selection in ["Number Input", "Slider"]:
-            new_max_value = st.number_input("Enter max value:", key=f"{selected_category}_standalone_max")
-            new_min_value = st.number_input("Enter min value:", key=f"{selected_category}_standalone_min")
-
-            if new_max_value <= new_min_value:
-                new_range_error = True
-                st.error("Max value must be strictly greater than the Min value.")
-
-            extra_settings["max"] = new_max_value
-            extra_settings["min"] = new_min_value
-
-        elif new_field_selection in ["Dropdown List", "Radio Button", "Check Box"]:
-            new_raw_options = st.text_input("Enter options (comma separated):", key=f"{selected_category}_standalone_opts")
-            new_cleaned_options = new_raw_options.replace(".", ",").strip().rstrip(",").strip()
-
-            if "," in new_cleaned_options:
-                extra_settings["options"] = new_cleaned_options
-            else:
-                st.error("Validation Error: You must enter at least two options separated by a comma.")
-                new_validation_error = True
-
-        if st.button("Save & Append to Category", key=f"{selected_category}_standalone_append_btn"):
-            if not new_field_prompt.strip():
-                st.error("Please enter a name for the prompt before adding.")
-            elif (new_field_selection in ["Dropdown List", "Radio Button"]) and not extra_settings.get("options", "").strip():
-                st.error(f"Please enter options for the {new_field_selection}.")
-            elif new_range_error:
-                st.error("Cannot save: Please fix the Min/Max range issue first.")
-            elif new_validation_error:
-                st.error("Cannot save: Please fix options before adding.")
-            else:
-                try:
-                    fresh_category_data = requests.get(f"{URL}/settings/{selected_category}").json()
-                    current_prompts = fresh_category_data.get("prompts", [])
-                    current_prompts.append(extra_settings)
-
-                    append_payload = {
-                            "category": fresh_category_data.get("category", selected_category),
-                            "prompts": current_prompts,
-                            "camera": fresh_category_data.get("camera", "False"),
-                            "roboflow": fresh_category_data.get("roboflow", False)
-                        }
-                    
-                    response = requests.post(f"{URL}/settings", json=append_payload)
-
-                    if response.status_code in [200, 201]:
-                        st.success(f"Successfully appended '{new_field_prompt}' to {selected_category}!")
-                        time.sleep(2)
-                        st.rerun()
-                    else:
-                        st.error(f"Failed to append. Server rejected with code: {response.status_code}")
-                except Exception as e:
-                    st.error(f"Network error trying to append: {str(e)}")
-
-st.title("Role Requests")
-st.divider()
-
-# Fetch pending requests from backend
 try:
-  requests_response = requests.get(f"{URL}/requests")
-  pending_requests = (
-      requests_response.json() if requests_response.status_code == 200 else []
-  )
+  existing_categories = requests.get(f"{URL}/home").json()
 except Exception:
-  pending_requests = []
+  existing_categories = []
 
-if not pending_requests:
-  st.info("No pending role requests found.")
+if not existing_categories:
+  st.info("No categories available to edit.")
 else:
-  st.subheader(f"Pending Requests ({len(pending_requests)})")
+  selected_category = st.selectbox(
+      "Select the category you wish to edit:",
+      existing_categories,
+      key="edit_category_selector",
+  )
 
-  for index, req in enumerate(pending_requests):
-    req_email = req.get("email", "Unknown Email")
-    req_name = req.get("name", "Unknown")
-    req_reason = req.get("reason", "No reason provided.")
-    req_date = req.get("date", "Unknown")
+  if (
+      "edit_target_category" not in st.session_state
+      or st.session_state.edit_target_category != selected_category
+  ):
+    try:
+      cat_data = requests.get(f"{URL}/settings/{selected_category}").json()
+      st.session_state.edit_target_category = selected_category
+      st.session_state.editable_prompts = [
+          dict(p) for p in cat_data.get("prompts", [])
+      ]
+      st.session_state.edit_camera = cat_data.get("camera", "False")
+      st.session_state.edit_roboflow = cat_data.get("roboflow", False)
+    except Exception:
+      st.session_state.editable_prompts = []
+      st.session_state.edit_camera = "False"
+      st.session_state.edit_roboflow = False
 
-    with st.expander(f"Request from: {req_email} -> Name: {req_name}"):
-      st.write(f"**Email:** {req_email}")
-      st.write(f"**Name:** {req_name}")
-      st.write(f"**Reason / Notes:** {req_reason}")
-      st.write(f"**Date:** {req_date}")
+  if "editable_prompts" not in st.session_state:
+    st.session_state.editable_prompts = []
 
-      available_roles = ["admin", "developer", "collector"]
-      selected_role = st.selectbox(
-          "Assign Role:",
-          available_roles,
-          key=f"role_select_{index}_{req_email}",
+  with st.expander(f"Modify Fields for: {selected_category}", expanded=True):
+    st.markdown(
+        "Make your changes directly below. You can edit field names, modify"
+        " options, delete fields, or add new ones."
+    )
+    st.divider()
+
+    available_displays = [
+        "Text Box",
+        "Text Area (multi-line)",
+        "Number Input",
+        "Dropdown List",
+        "Radio Button",
+        "Slider",
+    ]
+
+    prompts_to_delete = []
+
+    for i, p_item in enumerate(st.session_state.editable_prompts):
+      st.markdown(f"### Field #{i+1}")
+
+      col_a, col_b = st.columns([3, 1])
+      with col_a:
+        p_item["prompt"] = st.text_input(
+            "Field Label:", value=p_item.get("prompt", ""), key=f"edit_p_name_{i}"
+        )
+      with col_b:
+        current_sel = p_item.get("selection", "Text Box")
+        default_idx = (
+            available_displays.index(current_sel)
+            if current_sel in available_displays
+            else 0
+        )
+        p_item["selection"] = st.selectbox(
+            "Display Type:",
+            available_displays,
+            index=default_idx,
+            key=f"edit_p_sel_{i}",
+        )
+
+      if p_item["selection"] in ["Number Input", "Slider"]:
+        c1, c2 = st.columns(2)
+        with c1:
+          p_item["min"] = st.number_input(
+              "Min Value:",
+              value=float(p_item.get("min", 0)),
+              key=f"edit_p_min_{i}",
+          )
+        with c2:
+          p_item["max"] = st.number_input(
+              "Max Value:",
+              value=float(p_item.get("max", 10)),
+              key=f"edit_p_max_{i}",
+          )
+      elif p_item["selection"] in ["Dropdown List", "Radio Button", "Check Box"]:
+        raw_opts = p_item.get("options", "")
+        p_item["options"] = st.text_input(
+            "Options (comma separated):",
+            value=raw_opts,
+            key=f"edit_p_opts_{i}",
+            placeholder="e.g., Option 1, Option 2",
+        )
+
+      if st.button("🗑️ Remove This Field", key=f"remove_field_{i}"):
+        prompts_to_delete.append(i)
+
+      st.divider()
+
+    if prompts_to_delete:
+      for index in sorted(prompts_to_delete, reverse=True):
+        st.session_state.editable_prompts.pop(index)
+      st.rerun()
+
+    with st.expander("➕ Add Another Field to this Category"):
+      new_f_name = st.text_input(
+          "New Field Label", key="quick_add_name", placeholder="e.g., Notes"
+      )
+      new_f_type = st.selectbox(
+          "New Field Display Type", available_displays, key="quick_add_type"
       )
 
-      col1, col2 = st.columns(2)
+      new_f_dict = {"prompt": new_f_name, "selection": new_f_type}
 
-      with col1:
-        if st.button("Approve & Assign", key=f"approve_{index}_{req_email}"):
-          payload = {"email": req_email, "role": selected_role}
-          res = requests.post(f"{URL}/roles/assign", json=payload)
+      if new_f_type in ["Number Input", "Slider"]:
+        new_f_dict["min"] = st.number_input("Min:", value=0.0, key="qa_min")
+        new_f_dict["max"] = st.number_input("Max:", value=10.0, key="qa_max")
+      elif new_f_type in ["Dropdown List", "Radio Button", "Check Box"]:
+        new_f_dict["options"] = st.text_input(
+            "Options (comma separated):",
+            key="qa_opts",
+            placeholder="Yes, No",
+        )
 
-          if res.status_code in [200, 201]:
-            requests.delete(f"{URL}/requests/remove", json={"email": req_email})
-            st.success(
-                f"Successfully approved {req_email} for role '{selected_role}'!"
-            )
-            st.rerun()
+      if st.button("Append Field"):
+        if not new_f_name.strip():
+          st.error("Field label cannot be empty.")
+        else:
+          st.session_state.editable_prompts.append(new_f_dict)
+          st.success("Field added to queue!")
+          st.rerun()
+
+    st.divider()
+    st.subheader("Integration & Hardware Settings")
+
+    current_rf = st.session_state.get("edit_roboflow", False)
+    rf_toggle = st.selectbox(
+        "Enable Automatic Roboflow Upload",
+        ["False", "True"],
+        index=1 if current_rf else 0,
+        key="edit_rf_toggle",
+    )
+
+    if rf_toggle == "True":
+      default_api = (
+          current_rf.get("api_key", "") if isinstance(current_rf, dict) else ""
+      )
+      default_ws = (
+          current_rf.get("workspace", "") if isinstance(current_rf, dict) else ""
+      )
+      default_proj = (
+          current_rf.get("project_id", "")
+          if isinstance(current_rf, dict)
+          else ""
+      )
+
+      rf_api_key = st.text_input(
+          "RoboFlow API Key:",
+          value=default_api,
+          type="password",
+          key="edit_rf_api_key",
+      )
+      rf_workspace = st.text_input(
+          "Workspace:", value=default_ws, key="edit_rf_workspace"
+      )
+      rf_project_id = st.text_input(
+          "Project ID:", value=default_proj, key="edit_rf_project_id"
+      )
+
+      if rf_api_key and rf_workspace and rf_project_id:
+        try:
+          rf_response = requests.get(
+              f"https://api.roboflow.com/{rf_workspace}/{rf_project_id}",
+              params={"api_key": rf_api_key},
+          )
+          if rf_response.status_code == 200:
+            st.success("Roboflow credentials verified successfully!")
+            st.session_state.edit_roboflow = {
+                "api_key": rf_api_key,
+                "workspace": rf_workspace,
+                "project_id": rf_project_id,
+            }
           else:
-            st.error("Failed to approve request on the backend.")
-
-      with col2:
-        if st.button("Dismiss / Reject", key=f"reject_{index}_{req_email}"):
-          payload = {"email": req_email}
-          res = requests.delete(f"{URL}/requests/remove", json=payload)
-
-          if res.status_code in [200, 201]:
-            st.warning(f"Dismissed request for {req_email}.")
-            st.rerun()
-          else:
-            st.error("Failed to dismiss request.")
-    
-st.divider()
-st.title("Edit Roles")
-st.divider()
-
-st.subheader("Manage User Roles")
-
-try:
-  roles_response = requests.get(f"{URL}/roles")
-  roles = (
-      roles_response.json() if roles_response.status_code == 200 else {}
-  )
-except Exception:
-  roles = {}
-
-if not roles:
-  st.info("No roles or assignments found.")
-else:
-  # Assuming roles is a dictionary like: {"Admin": ["user@test.com"], "User": [...]}
-  for role_name, users in roles.items():
-    st.write(f"### Role: `{role_name}`")
-
-    if not users:
-      st.write("_No users assigned to this role._")
+            st.error("Invalid Roboflow Credentials")
+            st.session_state.edit_roboflow = False
+        except Exception:
+          st.error("Roboflow Network Connection Failed.")
+          st.session_state.edit_roboflow = False
+      else:
+        st.session_state.edit_roboflow = False
     else:
-      for user_email in users:
-        col1, col2 = st.columns([3, 1])
-        with col1:
-          st.write(f"• {user_email}")
-        with col2:
-          # Delete / Revoke button for each user under this role
-          if st.button("Delete", key=f"del_{role_name}_{user_email}"):
-            payload = {"email": user_email, "role": role_name}
-            delete_response = requests.delete(
-                f"{URL}/roles/remove", json=payload
-            )
-
-            if delete_response.status_code == 200:
-              st.success(f"Removed {user_email} from {role_name}")
-              st.rerun()
-            else:
-              st.error("Failed to remove user.")
+      st.session_state.edit_roboflow = False
 
     st.divider()
 
+    camera_val = str(st.session_state.get("edit_camera", "False"))
+    st.session_state.edit_camera = st.selectbox(
+        "Use of Kinect camera:",
+        ["False", "True"],
+        index=0 if camera_val == "False" else 1,
+        key="edit_cam_select",
+    )
 
-    
+    st.divider()
+    if st.button("💾 Save All Changes", type="primary"):
+      if not st.session_state.editable_prompts:
+        st.error(
+            "Validation Error: A category must contain at least one field."
+        )
+      else:
+        has_empty_names = any(
+            not p.get("prompt", "").strip()
+            for p in st.session_state.editable_prompts
+        )
+        if has_empty_names:
+          st.error("All fields must have a valid label name.")
+        else:
+          update_payload = {
+              "category": selected_category,
+              "prompts": st.session_state.editable_prompts,
+              "camera": st.session_state.edit_camera,
+              "roboflow": st.session_state.edit_roboflow,
+          }
+
+          response = requests.post(f"{URL}/settings", json=update_payload)
+
+          if response.status_code in [200, 201]:
+            st.success("Category successfully updated!")
+            if "edit_target_category" in st.session_state:
+              del st.session_state.edit_target_category
+            time.sleep(2)
+            st.rerun()
+          else:
+            st.error(
+                f"Failed to update category. Server error code:"
+                f" {response.status_code}"
+            )
+
+# =========================================================================
+# ADMIN-ONLY ROLE & USER MANAGEMENT SECTION
+# =========================================================================
+if is_admin:
+  st.divider()
+  st.title("Request Management")
+  try:
+    requests_response = requests.get(f"{URL}/requests")
+    pending_requests = (
+        requests_response.json() if requests_response.status_code == 200 else []
+    )
+  except Exception:
+    pending_requests = []
+
+  if not pending_requests:
+    st.info("No pending role requests found.")
+  else:
+    st.subheader(f"Pending Requests ({len(pending_requests)})")
+
+    for index, req in enumerate(pending_requests):
+      req_email = req.get("email", "Unknown Email")
+      req_name = req.get("name", "Unknown")
+      req_reason = req.get("reason", "No reason provided.")
+      req_date = req.get("date", "Unknown")
+
+      with st.expander(f"Request from: {req_email} -> Name: {req_name}"):
+        st.write(f"**Email:** {req_email}")
+        st.write(f"**Name:** {req_name}")
+        st.write(f"**Reason / Notes:** {req_reason}")
+        st.write(f"**Date:** {req_date}")
+
+        available_roles = ["admin", "developer", "collector"]
+        selected_role = st.selectbox(
+            "Assign Role:",
+            available_roles,
+            key=f"role_select_{index}_{req_email}",
+        )
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+          if st.button("Approve & Assign", key=f"approve_{index}_{req_email}"):
+            payload = {"email": req_email, "role": selected_role}
+            res = requests.post(f"{URL}/roles/assign", json=payload)
+
+            if res.status_code in [200, 201]:
+              requests.delete(f"{URL}/requests/remove", json={"email": req_email})
+              st.success(
+                  f"Successfully approved {req_email} for role '{selected_role}'!"
+              )
+              st.rerun()
+            else:
+              st.error("Failed to approve request on the backend.")
+
+        with col2:
+          if st.button("Dismiss / Reject", key=f"reject_{index}_{req_email}"):
+            payload = {"email": req_email}
+            res = requests.delete(f"{URL}/requests/remove", json=payload)
+
+            if res.status_code in [200, 201]:
+              st.warning(f"Dismissed request for {req_email}.")
+              st.rerun()
+            else:
+              st.error("Failed to dismiss request.")
+
+  st.divider()
+  st.title("Edit Roles & User Management")
+  st.divider()
+
+  st.subheader("Directly Assign / Invite User Role")
+  with st.form("invite_user_form"):
+    invite_email = st.text_input("User Email Address:")
+    invite_role = st.selectbox(
+        "Select Role to Assign:", ["admin", "developer", "collector"]
+    )
+    submit_invite = st.form_submit_button("Assign Role")
+
+    if submit_invite:
+      if not invite_email.strip():
+        st.error("Please enter a valid email address.")
+      else:
+        payload = {"email": invite_email.strip(), "role": invite_role}
+        res = requests.post(f"{URL}/roles/assign", json=payload)
+        if res.status_code in [200, 201]:
+          st.success(
+              f"Successfully assigned {invite_email} to role '{invite_role}'!"
+          )
+          st.rerun()
+        else:
+          st.error("Failed to assign role on the backend.")
+
+  st.divider()
+  st.subheader("Manage Existing User Roles")
+
+  try:
+    roles_response = requests.get(f"{URL}/roles")
+    roles = roles_response.json() if roles_response.status_code == 200 else {}
+  except Exception:
+    roles = {}
+
+  if not roles:
+    st.info("No roles or assignments found.")
+  else:
+    for role_name, users in roles.items():
+      role_descriptions = {
+          "admin": "👑 **Administrator:** Full system access, including category configuration, user role management, request approvals, and workspace analytics.",
+          "developer": "🔬 **Developer:** Access to category structure creation, field modifications, and advanced hyperparameter controls for model training scripts.",
+          "collector": "🎯 **Collector:** Access to data collection forms, image capture workflows, and the manual Roboflow dataset curation workspace."
+      }
+      
+      st.write(f"### Role: `{role_name}`")
+      if role_name in role_descriptions:
+        st.info(role_descriptions[role_name])
+
+      if not users:
+        st.write("_No users assigned to this role._")
+      else:
+        for user_email in users:
+          col1, col2, col3 = st.columns([2, 1, 1])
+          with col1:
+            st.write(f"• {user_email}")
+          with col2:
+            reassign_role = st.selectbox(
+                "Change Role",
+                ["admin", "developer", "collector"],
+                index=["admin", "developer", "collector"].index(role_name)
+                if role_name in ["admin", "developer", "collector"]
+                else 0,
+                key=f"reassign_{role_name}_{user_email}",
+                label_visibility="collapsed",
+            )
+            if st.button(
+                "Move", key=f"move_btn_{role_name}_{user_email}"
+            ) and reassign_role != role_name:
+              res_add = requests.post(
+                  f"{URL}/roles/assign",
+                  json={"email": user_email, "role": reassign_role},
+              )
+              res_rem = requests.delete(
+                  f"{URL}/roles/remove",
+                  json={"email": user_email, "role": role_name},
+              )
+              if res_add.status_code in [200, 201]:
+                st.success(f"Moved {user_email} to {reassign_role}")
+                st.rerun()
+              else:
+                st.error("Failed to update role.")
+          with col3:
+            if st.button("Remove", key=f"del_{role_name}_{user_email}"):
+              payload = {"email": user_email, "role": role_name}
+              delete_response = requests.delete(
+                  f"{URL}/roles/remove", json=payload
+              )
+
+              if delete_response.status_code == 200:
+                st.success(f"Removed {user_email} from {role_name}")
+                st.rerun()
+              else:
+                st.error("Failed to remove user.")
+
+  st.divider()
+else:
+  st.divider()
+  st.info(
+      "🔒 **Restricted Area:** User role management, invitation tools, and"
+      " pending access request approvals are visible and manageable by"
+      " **Administrators only**."
+  )

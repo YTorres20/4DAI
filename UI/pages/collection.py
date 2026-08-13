@@ -1,9 +1,9 @@
-import streamlit as st 
-from key import URL
+from datetime import date
+import json
+import re
 import requests
-from datetime import date 
-import re 
-import json 
+import streamlit as st
+from key import URL
 
 # =========================================================================
 # ACCESS CONTROL & ROLE CHECKING
@@ -16,7 +16,7 @@ if not is_logged_in:
       "🔒 Please sign in with Google from the Home page to access this"
       " collection workspace."
   )
-  if st.button("⬅️ Return to Home"):
+  if st.button("⬅️ Return to Home", use_container_width=True):
     st.switch_page("UI/home.py")
   st.stop()
 
@@ -33,151 +33,243 @@ is_admin = user_email in roles.get("admin", [])
 is_dev = user_email in roles.get("developer", [])
 is_collector = user_email in roles.get("collector", [])
 
-# ENFORCE ACCESS: Change this condition if you want to restrict to specific roles only
-# Right now, it allows Admins, Developers, and Data Collectors.
 if not (is_admin or is_dev or is_collector):
   st.error(
       f"⛔ Access Denied: Your email (**{user_email}**) is not authorized to"
       " access collection forms."
   )
-  if st.button("🚪 Logout"):
+  if st.button("🚪 Logout", use_container_width=True):
     st.logout()
   st.stop()
 
-category = st.session_state.category 
-st.header(f"{category} Collection")
+# Ensure category exists in session state
+category = getattr(st, "category", "General")
+if "category" in st.session_state:
+  category = st.session_state.category
 
-page = requests.get(f"{URL}/settings/{category}").json()
+st.title(f"📝 {category} Data Collection Workspace")
+st.markdown(
+    "Fill out the required metadata fields below and capture or upload your"
+    " sample imagery."
+)
+st.divider()
 
-prompts = page["prompts"]
+# Fetch configuration prompts
+try:
+  page = requests.get(f"{URL}/settings/{category}").json()
+except Exception:
+  page = {"prompts": [], "camera": True, "roboflow": False}
 
+prompts = page.get("prompts", [])
+
+if not prompts:
+  st.info(
+      "No configuration prompts found for this category. Please check your"
+      " backend settings."
+  )
+
+# =========================================================================
+# SECTION 1: METADATA FORM INPUTS
+# =========================================================================
+st.subheader("1. Sample Metadata")
 values = {}
 
+# Use columns for a cleaner layout if there are multiple fields
 for count, prompt in enumerate(prompts):
-    selection = prompt["selection"]
+  selection = prompt["selection"]
+  label = prompt["prompt"]
+  key_name = f"input_{label}_{count}"
 
-    match selection:
-        case "Text Box":
-            values[prompt["prompt"]] = st.text_input(prompt["prompt"], key=f"input_{prompt['prompt']}{count}")
+  match selection:
+    case "Text Box":
+      values[label] = st.text_input(label, key=key_name)
 
-        case "Text Area (multi-line)":
-            values[prompt["prompt"]] = st.text_area(prompt["prompt"], key=f"input_{prompt['prompt']}{count}")
-        
-        case "Number Input":
-            values[prompt["prompt"]] = st.number_input(prompt["prompt"], min_value=prompt["min"], max_value=prompt["max"], key=f"input_{prompt['prompt']}{count}")
-        
-        case "Dropdown List":
-            options = [opt.strip() for opt in prompt["options"].split(",")]
-            values[prompt["prompt"]] = st.selectbox(prompt["prompt"], options=options, key=f"input_{prompt['prompt']}{count}")
+    case "Text Area (multi-line)":
+      values[label] = st.text_area(label, key=key_name)
 
-        case "Radio Button":
-            options = [opt.strip() for opt in prompt["options"].split(",")]
-            values[prompt["prompt"]] = st.radio(prompt["prompt"], options=options, key=f"input_{prompt['prompt']}{count}")
-        
-        case "Slider": 
-            values[prompt["prompt"]] = st.slider(prompt["prompt"], min_value=prompt["min"], max_value=prompt["max"], key=f"input_{prompt['prompt']}{count}")
-        
-use_camera = page["camera"]
+    case "Number Input":
+      values[label] = st.number_input(
+          label,
+          min_value=prompt.get("min", 0.0),
+          max_value=prompt.get("max", 1000.0),
+          key=key_name,
+      )
+
+    case "Dropdown List":
+      options = [opt.strip() for opt in prompt.get("options", "").split(",")]
+      values[label] = st.selectbox(label, options=options, key=key_name)
+
+    case "Radio Button":
+      options = [opt.strip() for opt in prompt.get("options", "").split(",")]
+      values[label] = st.radio(label, options=options, key=key_name)
+
+    case "Slider":
+      values[label] = st.slider(
+          label,
+          min_value=prompt.get("min", 0),
+          max_value=prompt.get("max", 100),
+          key=key_name,
+      )
+
+st.divider()
+
+# =========================================================================
+# SECTION 2: IMAGE CAPTURE & QUEUE
+# =========================================================================
+st.subheader("2. Sample Imagery Capture")
 
 if "images" not in st.session_state:
-    st.session_state.images = []
+  st.session_state.images = []
 
-# kinect camera should be here
-picture = st.camera_input("LIVE")
+camera_col, queue_col = st.columns([1.2, 1])
 
-if picture:
-    st.image(picture, caption="Captured Image")
-    if st.button("Add Image"):
-        st.session_state.images.append(picture)
-        st.success("Image added")
+with camera_col:
+  st.markdown("📸 **Live Camera Feed**")
+  picture = st.camera_input("Position sample and capture image")
 
+  if picture:
+    if st.button("➕ Add Captured Image to Queue", use_container_width=True):
+      st.session_state.images.append(picture)
+      st.success("Image successfully added to queue!")
+      st.rerun()
+
+with queue_col:
+  st.markdown(
+      f"🖼️ **Captured Queue ({len(st.session_state.images)} images)**"
+  )
+
+  if not st.session_state.images:
+    st.info("No images captured yet. Take a snapshot to add it to the queue.")
+  else:
+    for idx, img in enumerate(list(st.session_state.images)):
+      q_col1, q_col2 = st.columns([3, 1])
+      with q_col1:
+        st.image(img, caption=f"Shot #{idx + 1}", use_container_width=True)
+      with q_col2:
+        st.write("")  # alignment
+        if st.button("❌", key=f"remove_img_{idx}", help="Remove this image"):
+          st.session_state.images.pop(idx)
+          st.rerun()
+
+    if st.button("🗑️ Clear All Images", use_container_width=True):
+      st.session_state.images = []
+      st.rerun()
+
+st.divider()
+
+# Initialize submission state trackers
 if "submitted" not in st.session_state:
-    st.session_state.submitted = False
-
+  st.session_state.submitted = False
 if "robo_submission" not in st.session_state:
-    st.session_state.robo_submission = False 
+  st.session_state.robo_submission = False
+if "sample_id" not in st.session_state:
+  st.session_state.sample_id = None
 
-if st.button("Submit"):
-        
-    today= date.today()
-     
+# =========================================================================
+# SECTION 3: SUBMISSION HANDLER
+# =========================================================================
+st.subheader("3. Final Submission")
 
-    if len(st.session_state.images) == 0:
-        st.error("Please add at least one image!")
-    else:
-        response = requests.post(f"{URL}/collection/submission",
-                                     json={
-                                         "category": category,
-                                         "date":str(today),
-                                         "data": values 
-                                        }
-                                     ).json()
-        
+col_sub1, col_sub2 = st.columns([2, 1])
+with col_sub1:
+  st.markdown(
+      "Review your entered metadata and captured images above, then click"
+      " **Submit Record** to upload to the server and push to RoboFlow (if"
+      " configured)."
+  )
+
+with col_sub2:
+  submit_btn = st.button(
+      "🚀 Submit Record", type="primary", use_container_width=True
+  )
+
+if submit_btn:
+  today = date.today()
+
+  if len(st.session_state.images) == 0:
+    st.error(
+        "⚠️ Please add at least one captured image before submitting the form!"
+    )
+  else:
+    with st.spinner("Submitting record and uploading images..."):
+      # 1. Post primary sample submission data
+      try:
+        response = requests.post(
+            f"{URL}/collection/submission",
+            json={"category": category, "date": str(today), "data": values},
+        ).json()
         sample_id = response["sample_id"]
-        
-        for image in st.session_state.images:
-            image.seek(0)
-            response = requests.post(f"{URL}/collection/images/upload",
-                                     files = {
-                                         "file": image
-                                     },
-                                     data = {
-                                         "sample_id": sample_id,
-                                         "category": category
-                                     }
-                                     )
-            
-            if response.status_code != 200:
-                st.error("Image Upload Failed!")
-                st.stop()
+      except Exception as e:
+        st.error(f"Failed to create submission record: {e}")
+        st.stop()
 
-            image_id = response.json()["image_id"]
-            st.session_state.submitted = True 
-            st.session_state.sample_id = sample_id
+      robo_success_count = 0
+      upload_failed = False
 
-            if not page["roboflow"] == False:
-                # REWIND THE FILE POINTER SO ROBOFLOW CAN READ IT
-                image.seek(0)
-                roboflow_settings = page["roboflow"]
-                project_id = roboflow_settings["project_id"]
-                roboflow_URL = f"https://api.roboflow.com/dataset/{project_id}/upload"
+      # 2. Upload each image associated with the sample
+      for image in st.session_state.images:
+        image.seek(0)
+        img_response = requests.post(
+            f"{URL}/collection/images/upload",
+            files={"file": image},
+            data={"sample_id": sample_id, "category": category},
+        )
 
-               
-                image_information.update(values)
-                params = {
-                    "api_key":roboflow_settings["api_key"],
-                }  
-                image_information = {"sample_id": str(sample_id)}
-                
-                for prompt_text, user_answer in values.items():
-                    #  STRIP ALL SPECIAL CHARACTERS: Keeps only letters, numbers, and spaces
-                    clean_key = re.sub(r'[^a-zA-Z0-9\s]', '', prompt_text)
-                    # Replace spaces with clean underscores
-                    clean_key = clean_key.strip().replace(" ", "_")
-                    
-                    image_information[clean_key] = str(user_answer)
+        if img_response.status_code != 200:
+          upload_failed = True
+          break
 
-                payload_data = {
-                    "name": f"{category}:Image ID:{image_id}",
-                    "metadata": json.dumps(image_information)
-                }
-                
-                files ={
-                    "file":image
-                }
+        image_id = img_response.json()["image_id"]
 
-                roboflow_response = requests.post(roboflow_URL,params=params, files=files,data=payload_data)
+        # 3. Handle automatic RoboFlow forwarding if configured
+        roboflow_settings = page.get("roboflow")
+        if roboflow_settings:
+          image.seek(0)
+          project_id = roboflow_settings["project_id"]
+          roboflow_URL = (
+              f"https://api.roboflow.com/dataset/{project_id}/upload"
+          )
 
-                if roboflow_response.status_code == 200:
-                    st.session_state.robo_submission = True 
+          image_information = {"sample_id": str(sample_id)}
+          for prompt_text, user_answer in values.items():
+            clean_key = re.sub(r"[^a-zA-Z0-9\s]", "", prompt_text)
+            clean_key = clean_key.strip().replace(" ", "_")
+            image_information[clean_key] = str(user_answer)
 
+          params = {"api_key": roboflow_settings["api_key"]}
+          payload_data = {
+              "name": f"{category}:Image ID:{image_id}",
+              "metadata": json.dumps(image_information),
+          }
+          files = {"file": image}
+
+          try:
+            rf_response = requests.post(
+                roboflow_URL, params=params, files=files, data=payload_data
+            )
+            if rf_response.status_code == 200:
+              robo_success_count += 1
+          except Exception:
+            pass
+
+      if upload_failed:
+        st.error(
+            "❌ One or more images failed to upload to the server repository."
+        )
+      else:
+        st.session_state.submitted = True
+        st.session_state.sample_id = sample_id
+        if robo_success_count > 0:
+          st.session_state.robo_submission = True
+
+        st.success("✅ Submission Successful!")
+        st.success(f"**Sample ID Assigned:** `{sample_id}`")
+        if st.session_state.robo_submission:
+          st.success(
+              f"✅ Successfully synced {robo_success_count} image(s) to"
+              " RoboFlow!"
+          )
+
+        # Clear image queue after successful push
         st.session_state.images = []
-        st.rerun()           
-
-if st.session_state.submitted:
-    st.success("Submission Sucessful!")
-    st.success(f"Sample ID: {st.session_state.sample_id}")
-
-if st.session_state.robo_submission:
-    st.success("RoboFlow Submission Successful")
-
+        st.balloons()
