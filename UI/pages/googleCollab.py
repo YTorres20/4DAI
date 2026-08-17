@@ -210,6 +210,14 @@ else:
 
 if st.session_state.lock_1:
   st.success("Configuration locked!")
+  
+  # Google Account Switcher / Login Helper for Team Members
+  st.markdown(
+      "🔑 **Using Colab Pro?** Make sure you are signed into the correct"
+      " research account before opening notebooks: "
+      "[Switch / Login to Google Account](https://accounts.google.com/AccountChooser)"
+  )
+  
   st.subheader("Google Colab Pro Training Code")
   st.write(
       "Copy and paste this into the first cell of your Google Colab Pro"
