@@ -139,12 +139,6 @@ def create_page_configuration(page: dict):
   with open(file_path, "w") as infile:
     json.dump(page, infile, indent=4)
 
-  log_action(
-      email="Admin/Developer",
-      action=f"Updated/Created Category: {category}",
-      details={"category": category},
-  )
-
   return {"message": "saved", "file": file_path}
 
 
@@ -161,10 +155,6 @@ def create_roboflow_home_configuration(roboflow: dict):
   with open(f"{roboflow_folder}/{setting_name}.json", "w") as infile:
     json.dump(roboflow, infile, indent=4)
 
-  log_action(
-      email="Admin/Developer",
-      action=f"Configured Roboflow Setting: {setting_name}",
-  )
   return {"message": "saved"}
 
 
@@ -215,11 +205,6 @@ def request(request: dict):
   with open("requests.json", "w") as infile:
     json.dump(request_data, infile, indent=4)
 
-  log_action(
-      email=request.get("email", "Unknown"),
-      action="Submitted Access Request",
-      details=request,
-  )
   return {"message": "saved"}
 
 
@@ -247,11 +232,6 @@ def assign_roles(new_person: dict):
   with open("roles.json", "w") as infile:
     json.dump(roles_data, infile, indent=4)
 
-  log_action(
-      email="Administrator",
-      action=f"Assigned Role '{new_role}'",
-      details={"target_email": new_email, "role": new_role},
-  )
   return {"status": "success"}
 
 
@@ -270,11 +250,6 @@ def remove_request(payload: dict):
   with open("requests.json", "w") as infile:
     json.dump(requests_list, infile, indent=4)
 
-  log_action(
-      email="Administrator",
-      action="Dismissed/Removed Access Request",
-      details={"target_email": target_email},
-  )
   return {"status": "success"}
 
 
@@ -293,11 +268,6 @@ def remove_role_assignment(payload: dict):
     with open("roles.json", "w") as infile:
       json.dump(roles_data, infile, indent=4)
 
-    log_action(
-        email="Administrator",
-        action=f"Removed Role '{target_role}'",
-        details={"target_email": target_email, "role": target_role},
-    )
     return {"status": "success"}
 
   return {"status": "error", "message": "Role or email not found"}

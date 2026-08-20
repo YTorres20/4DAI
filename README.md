@@ -2,66 +2,68 @@
 
 ## Overview
 
-The Dynamic Data Collection Platform is a web-based application designed to create, manage, and collect custom datasets through dynamically generated forms and image capture. The system consists of a Streamlit frontend for user interaction and a FastAPI backend for data storage and retrieval.
+The Dynamic Data Collection Platform is a web-based application designed to create, manage, and collect custom datasets through dynamically generated forms and image capture.
+
+The system consists of:
+
+- Streamlit frontend for user interaction
+- FastAPI backend for data storage and retrieval
+- MongoDB database for sample and image metadata
+- Optional Roboflow integration for dataset synchronization
 
 Unlike traditional collection systems that are limited to specific data types, this platform allows users to create their own collection categories, define custom prompts, capture multiple images per sample, and optionally synchronize collected data with Roboflow.
 
-The application supports:
+## Key Capabilities
 
-* Custom category creation
-* Dynamic form generation
-* Multiple image capture per sample
-* MongoDB data storage
-* Image management and downloads
-* Date-based filtering
-* Roboflow integration
-* Category editing and management
----
+- Custom category creation
+- Dynamic form generation
+- Multiple image capture per sample
+- MongoDB data storage
+- Image management and downloads
+- Date-based filtering
+- Roboflow integration
+- Category editing and management
 
-# Technologies Used
+## Technologies Used
 
-## Frontend
+### Frontend
 
-* Streamlit
+Streamlit
 
-## Backend
+### Backend
 
-* FastAPI
-* Uvicorn
+FastAPI  
+Uvicorn
 
-## Database
+### Database
 
-* MongoDB
+MongoDB
 
-## Networking / Deployment
+### Networking / Deployment
 
-* ngrok (optional remote access)
+ngrok (optional remote access)
 
-## Programming Language
+### Programming Language
 
-* Python 3.10+
+Python 3.10+
 
----
+## Installation References
 
-# Installation References
+### MongoDB
 
-## MongoDB
-
-Installed using the official MongoDB documentation:
+MongoDB can be installed using the official MongoDB documentation:
 
 https://www.mongodb.com/docs/manual/installation/
 
-## ngrok
+### ngrok
 
-Installed and configured using:
+ngrok can be installed and configured using:
 
 https://ngrok.com/docs/getting-started/
 
----
+## Project Structure
 
-# Project Structure
-
-```text
+```
 project/
 │
 ├── Server/
@@ -72,41 +74,58 @@ project/
 │   │
 │   └── settings/
 │       └── category.json
+├── bin/
 │
 ├── UI/
 │   ├── home.py
 │   ├── key.py
 │   └── pages/
-│       ├── settings.py
 │       ├── collection.py
+│       ├── developer_lab.py
+│       ├── googleCollab.py
+│       ├── roboflow.py
+│       ├── settings.py
 │       └── view_data.py
 │
 ├── requirements.txt
 └── README.md
 ```
 
+## Utility Scripts (`bin/`)
+
+The `bin/` directory contains helper scripts designed to support project portability, codebase updates, and environment migration:
+
+- **`pack.py`**: Bundles project configuration files, settings schemas, and local asset/image directories into a compressed archive. This ensures seamless transfer of state, metadata, and database information whether you are migrating data to a new server or deploying across separate host machines.
+- **`unpack.py`**: Extracts and restores previously packed dataset or configuration archives directly into the correct workspace directories on the target environment.
+
+### Deployment & Migration Flexibility
+
+These utility scripts make it straightforward to adapt the application architecture depending on your hosting setup:
+- **Single Machine Mode:** Frontend and backend run locally on the same host, sharing access to local storage directories.
+- **Distributed Machine Mode:** The FastAPI backend and Streamlit frontend are hosted on separate machines, utilizing `pack.py` and `unpack.py` to transfer configuration states, schemas, and asset bundles cleanly between environments.
+
+> **Note on `UI/key.py` Configuration:** When running in Distributed Machine Mode (where the frontend and backend are on separate machines), you must update `UI/key.py` with the network address or public IP of the new machine hosting the server so the Streamlit UI can successfully communicate with the FastAPI backend.
 ---
+## Features
 
-# Features
-
-## Category Management
+### Category Management
 
 The Settings page allows users to create and manage custom collection categories.
 
 Users can:
 
-* Create unlimited categories
-* Define custom prompts for each category
-* Edit existing categories
-* Delete prompt fields
-* Add new prompt fields to existing categories
-* Configure camera settings
-* Configure Roboflow integration
-* Save category configurations
+- Create unlimited categories
+- Define custom prompts for each category
+- Edit existing categories
+- Delete prompt fields
+- Add new prompt fields to existing categories
+- Configure camera settings
+- Configure Roboflow integration
+- Save category configurations
 
 Category configurations are stored as JSON files on the server.
 
-```text
+```
 settings/
 ├── Vegetables.json
 ├── Soil_Moisture.json
@@ -114,46 +133,38 @@ settings/
 └── ...
 ```
 
-<img src="Assets/new_image2.png" height="500" width="700">
-
----
-
-## Dynamic Form Generation
+### Dynamic Form Generation
 
 Collection forms are generated automatically from each category's configuration.
 
 Supported prompt types include:
 
-* Text Box
-* Text Area (multi-line)
-* Number Input
-* Dropdown List
-* Radio Button
-* Slider
+- Text Box
+- Text Area (multi-line)
+- Number Input
+- Dropdown List
+- Radio Button
+- Slider
 
-Validation is performed to ensure proper prompt configuration before categories can be saved.
+Validation is performed to ensure that prompt configurations are properly defined before categories can be saved.
 
----
-
-## Data Collection
+### Data Collection
 
 Users can:
 
-* Select a collection category
-* Complete category-specific forms
-* Capture images directly from their browser
-* Attach multiple images to a single sample
-* Submit metadata and images together
+- Select a collection category.
+- Complete the category-specific form.
+- Capture images directly from their browser.
+- Attach multiple images to a single sample.
+- Submit metadata and images together.
 
 Each submission automatically receives a unique Sample ID.
 
----
+### Image Management
 
-## Image Management
+Images are organized by category and Sample ID.
 
-Images are organized by category and sample ID.
-
-```text
+```
 images/
 ├── Category_A/
 │   └── sample_id/
@@ -167,60 +178,70 @@ images/
 
 Each image receives a unique Image ID and is linked to its associated sample.
 
----
+### Roboflow Integration
 
-## Roboflow Integration
-
-The platform includes optional Roboflow integration.
+The platform includes optional integration with Roboflow.
 
 When enabled for a category, users can configure:
 
-* Roboflow API Key
-* Workspace Name
-* Project ID
+- Roboflow API Key
+- Workspace Name
+- Project ID
 
-The application validates credentials before saving.
+The application validates the provided credentials before saving the configuration.
+
+#### Sample Submission
 
 During sample submission:
 
-* Images are automatically uploaded to Roboflow
-* Metadata is attached to each uploaded image
-* Metadata includes Sample IDs and collected form responses
+- Images are automatically uploaded to Roboflow.
+- Metadata is attached to each uploaded image.
+- Metadata includes the Sample ID and collected form responses.
 
 This allows datasets collected through the platform to be synchronized directly with Roboflow projects.
 
----
-
-## Data Viewing
+### Data Viewing
 
 The View Collections page allows users to browse and review collected data.
 
 Features include:
 
-* Category selection
-* Date range filtering
-* Viewing sample information
-* Viewing collected form responses
-* Viewing all images associated with a sample
-* Downloading individual images
+- Category selection
+- Date-range filtering
+- Viewing sample information
+- Viewing collected form responses
+- Viewing all images associated with a sample
+- Downloading individual images
 
 Collected records are displayed in expandable sections for easier navigation.
 
----
+## Link Behaviors & Cloud Authentication
 
-# Database Structure
+### 1. Roboflow Dataset Ingestion Queue
 
-MongoDB stores sample information and image metadata.
+Images uploaded through the application's API pipeline are ingested into Roboflow's isolated staging and unassigned batch queues.
 
-Database:
+Direct web links cannot force Roboflow's interface to bypass this holding queue.
 
-```text
-Collections
+Unless a user is logged into the correct Roboflow account that owns the project workspace and navigates past the staging queue, newly uploaded images may not immediately appear in the main dataset view.
+
+### 2. Google Session Authentication & Colab Links
+
+Google's browser security rules prevent external web links from overriding active browser session cookies or automatically forcing a specific target email account.
+
+When users click links to Google Colab or other external Google resources, the browser defaults to whichever Google account is currently active in that browser session.
+
+Team members should ensure that they are signed into the correct research credentials before opening notebooks.
+
+An account-chooser link is provided directly in the application to help users switch profiles quickly.
+
+## Database Structure
+
+MongoDB stores sample information and image metadata across dedicated collections.
+
+### Database Collections
+
 ```
-
-Collections:
-
-```text
 Collections
 ├── images
 ├── category_1
@@ -229,192 +250,195 @@ Collections
 └── ...
 ```
 
+### Category Collections
+
 Each category created through the Settings page becomes its own MongoDB collection.
 
----
+These collections store:
 
-# Installation
+- Form submissions
+- Sample information
+- Category-specific metadata
 
-## Clone Repository
+### Images Collection
 
-```bash
+The images collection centrally tracks metadata and references for captured images associated with project samples.
+
+## Installation
+
+### 1. Clone Repository
+
+```
 git clone <repository-url>
 cd project
 ```
 
-## Create Virtual Environment
+### 2. Create a Virtual Environment
 
-### Mac/Linux
+#### Option A: Python venv
 
-```bash
+##### macOS / Linux
+
+```
 python3 -m venv app
 source app/bin/activate
 ```
 
-### Windows
+##### Windows
 
-```bash
+```
 python -m venv app
 app\Scripts\activate
 ```
 
-## Install Dependencies
+#### Option B: Conda
 
-```bash
+Ubuntu / Linux / macOS / Windows:
+
+```
+conda create -n app python=3.10
+conda activate app
+```
+
+### 3. Install Dependencies
+
+```
 pip install -r requirements.txt
 ```
 
----
+## MongoDB Setup
 
-# MongoDB Setup
+Install MongoDB and start the MongoDB service.
 
-Install MongoDB and start the service.
+Verify the installation:
 
-Verify installation:
-
-```bash
+```
 mongosh
 ```
 
 MongoDB runs locally by default at:
 
-```text
+```
 mongodb://localhost:27017
 ```
 
----
-
-# Running the Backend Server
+## Running the Backend Server
 
 Navigate to the Server directory:
 
-```bash
+```
 cd Server
 ```
 
-Start FastAPI:
+Start FastAPI with Uvicorn:
 
-```bash
+```
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-Backend URL:
+The backend will be available at:
 
-```text
+```
 http://127.0.0.1:8000
 ```
 
----
+## Optional: Exposing the Backend with ngrok
 
-# Optional: Exposing the Backend with ngrok
+If the frontend and backend are running on different machines, the backend can be exposed using ngrok:
 
-If the frontend and backend run on different machines, expose the backend using ngrok:
-
-```bash
+```
 ngrok http 8000
 ```
 
-Example:
+Example output:
 
-```text
+```
 Forwarding https://xxxx.ngrok-free.app -> http://localhost:8000
 ```
 
-Update the frontend URL in:
+Update the frontend API URL in:
 
-```python
+```
 # UI/key.py
 
 URL = "https://xxxx.ngrok-free.app"
 ```
 
----
-
-# Running the Streamlit Frontend
+## Running the Streamlit Frontend
 
 Navigate to the UI directory:
 
-```bash
+```
 cd UI
 ```
 
 Run Streamlit:
 
-```bash
+```
 streamlit run home.py
 ```
 
-Frontend URL:
+The frontend will be available at:
 
-```text
+```
 http://localhost:8501
 ```
+## API Endpoints
 
----
+### Category Configuration
 
-# API Endpoints
+#### Get Available Categories
 
-## Category Configuration
-
-### Get Available Categories
-
-```http
+```
 GET /home
 ```
 
-### Get Category Configuration
+#### Get Category Configuration
 
-```http
+```
 GET /settings/{category}
 ```
 
-### Create or Update Category Configuration
+#### Create or Update Category Configuration
 
-```http
+```
 POST /settings
 ```
 
----
+### Sample Management
 
-## Sample Management
+#### Create Sample Submission
 
-### Create Sample Submission
-
-```http
+```
 POST /collection/submission
 ```
 
-### Upload Sample Image
+#### Upload Sample Image
 
-```http
+```
 POST /collection/images/upload
 ```
 
-### Retrieve Samples for a Category
+#### Retrieve Samples for a Category
 
-```http
+```
 GET /collection/samples/{category}
 ```
 
----
+### Image Management
 
-## Image Management
+#### Retrieve Images for a Sample
 
-### Retrieve Images for a Sample
-
-```http
+```
 GET /collection/images/{sample_id}
 ```
 
-### Retrieve a Specific Image
+#### Retrieve a Specific Image
 
-```http
+```
 GET /collection/image/{image_id}
 ```
 
----
-
-
-# Author
+## Author
 
 Yarely Torres
