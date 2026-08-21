@@ -522,6 +522,11 @@ with cols[1]:
             f"Successfully uploaded {success_count} of {total_images} images to"
             " RoboFlow!"
         )
+        st.info(
+            "🔑 **To see your uploaded images, please log in to Roboflow using these credentials:**\n\n"
+            "- **Email:** `greatroboticslab2@gmail.com`\n"
+            "- **Password:** `Robotics!!22`"
+        )
         st.session_state.selected_images = []
         st.rerun()
       else:
