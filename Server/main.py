@@ -291,3 +291,120 @@ def get_all_routes():
     ]:
       routes.append(route.path)
   return sorted(list(set(routes)))
+
+
+# =========================================================================
+# TUTORIALS MANAGEMENT (JSON FILE STORAGE) ENDPOINTS
+# =========================================================================
+
+@app.get("/tutorials")
+def get_tutorials():
+    """Retrieves all tutorial records from the tutorials.json file."""
+    tutorials_file = "settings/tutorials.json"
+    if not os.path.exists(tutorials_file):
+        return []  
+    
+    try:
+        with open(tutorials_file, "r") as infile:
+            tutorials = json.load(infile)
+    except json.JSONDecodeError:
+        tutorials = []
+        
+    return tutorials
+
+@app.post("/tutorials")
+def create_tutorial(tutorial: dict):
+    tutorials_file = "settings/tutorials.json"
+    if os.path.exists(tutorials_file):
+        try:
+            with open(tutorials_file, "r") as infile:
+                tutorials = json.load(infile)
+        except json.JSONDecodeError:
+            tutorials = []
+    else:
+        tutorials = []
+    
+  
+    new_tutorial = {
+        "title": tutorial.get("title"),
+        "url": tutorial.get("url"),
+        "description": tutorial.get("description", ""),
+        "allow_developers": tutorial.get("allow_developers", False),
+        "allow_collector": tutorial.get("allow_collector", False),
+        "allow_guests": tutorial.get("allow_guests", False),
+        "added_by": tutorial.get("added_by", "Unknown")
+    }
+    
+    # Append and save back to the JSON file
+    tutorials.append(new_tutorial)
+    
+    with open(tutorials_file, "w") as infile:
+        json.dump(tutorials, infile, indent=4)
+        
+    return {"status": "success", "message": "Tutorial saved to JSON file."}
+
+# =========================================================================
+# FEEDBACK MANAGEMENT ENDPOINTS
+# =========================================================================
+
+feedback_file = "settings/feedback.json"
+
+@app.post("/feedback")
+def submit_feedback(feedback: dict):
+    """Saves user feedback into the feedback.json file."""
+    if os.path.exists(feedback_file):
+        try:
+            with open(feedback_file, "r") as infile:
+                feedback_data = json.load(infile)
+        except json.JSONDecodeError:
+            feedback_data = []
+    else:
+        feedback_data = []
+    
+    new_feedback = {
+        "email": feedback.get("email", "Anonymous"),
+        "name": feedback.get("name", "Unknown User"),
+        "category": feedback.get("category", "General"),
+        "message": feedback.get("message", ""),
+        "date": feedback.get("date", "")
+    }
+    
+    feedback_data.append(new_feedback)
+    
+    with open(feedback_file, "w") as infile:
+        json.dump(feedback_data, infile, indent=4)
+        
+    return {"status": "success", "message": "Feedback saved successfully."}
+
+@app.get("/feedback")
+def get_feedback():
+    """Retrieves all feedback records (useful for admins)."""
+    if not os.path.exists(feedback_file):
+        return []
+    try:
+        with open(feedback_file, "r") as infile:
+            return json.load(infile)
+    except json.JSONDecodeError:
+        return []
+
+@app.delete("/feedback/remove")
+def remove_feedback(payload: dict):
+    """Removes a specific feedback entry by its unique ID."""
+    target_id = payload.get("id")
+
+    if not os.path.exists(feedback_file):
+        return {"status": "error", "message": "Feedback file not found"}
+
+    try:
+        with open(feedback_file, "r") as infile:
+            feedback_data = json.load(infile)
+    except json.JSONDecodeError:
+        feedback_data = []
+
+    # Keep only feedback items that do NOT match the target ID
+    updated_feedback = [item for item in feedback_data if item.get("id") != target_id]
+
+    with open(feedback_file, "w") as infile:
+        json.dump(updated_feedback, infile, indent=4)
+
+    return {"status": "success", "message": "Feedback removed."}

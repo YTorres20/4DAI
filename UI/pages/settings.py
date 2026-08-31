@@ -9,14 +9,37 @@ import streamlit as st
 # =========================================================================
 # ACCESS CONTROL & ADMIN/DEVELOPER ROLE VERIFICATION
 # =========================================================================
+
 user_obj = getattr(st, "user", None) or getattr(st, "experimental_user", None)
 is_logged_in = user_obj and getattr(user_obj, "is_logged_in", False)
+user_email = getattr(user_obj, "email", "")
+user_name = getattr(user_obj, "name", "Unknown User")
 
-if not is_logged_in:
-  st.warning(
-      "🔒 Please sign in with Google from the Home page to access settings."
-  )
-  st.stop()
+st.markdown(
+            f"<div style='text-align: right; font-size: 0.85rem; color: #374151;"
+            f" line-height: 1.2;'><b>{user_name}</b><br><span"
+            f" style='color: #6B7280; font-size: 0.75rem;'>{user_email}</span></div>",
+            unsafe_allow_html=True,
+        )
+st.markdown("""
+          <style>
+          div[data-testid="top_logout_btn"] button {
+              color: white ;              /* White text */
+              border-radius: 12px ;       /* Rounded corners */
+              border: 2px solid #3e8e41 ; /* Dark green border */
+              font-size: 18px ;           /* Larger text */
+              padding: 10px 24px ;        /* Custom spacing */
+          }
+          </style>
+        """,
+        unsafe_allow_html=True,)
+
+cols = st.columns([8,1])
+with cols[1]:
+  if st.button("🚪 Logout", key="top_logout_btn"):
+            for key in list(st.session_state.keys()):
+              del st.session_state[key]
+            st.logout()
 
 # Fetch backend roles
 try:
@@ -24,7 +47,6 @@ try:
 except Exception:
   roles = {}
 
-user_email = getattr(user_obj, "email", "")
 is_admin = user_email in roles.get("admin", [])
 is_dev = user_email in roles.get("developer", [])
 

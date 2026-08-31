@@ -144,6 +144,7 @@ def check_user_access():
     return "Data Collector"
   else:
     request_access_dialog(user_email, user_name)
+    return "Guest"
 
 
 # =========================================================================
@@ -166,7 +167,7 @@ def show_home_dashboard():
   # =========================================================================
   # MODERN TOP-RIGHT HEADER & ACCOUNT TOOLBAR
   # =========================================================================
-  top_col1, top_col2 = st.columns([3, 1])
+  top_col1, top_col2 = st.columns([7, 1])
   with top_col1:
     st.title("Collections Overview")
     if is_logged_in:
@@ -191,6 +192,19 @@ def show_home_dashboard():
             f" style='color: #6B7280; font-size: 0.75rem;'>{user_email}</span></div>",
             unsafe_allow_html=True,
         )
+        st.markdown("""
+          <style>
+          /* Target only the button with the key 'my_unique_btn' */
+          div[data-testid="top_logout_btn"] button {
+              color: white ;              /* White text */
+              border-radius: 12px ;       /* Rounded corners */
+              border: 2px solid #3e8e41 ; /* Dark green border */
+              font-size: 18px ;           /* Larger text */
+              padding: 10px 24px ;        /* Custom spacing */
+          }
+          </style>
+        """,
+        unsafe_allow_html=True,)
         if st.button("🚪 Logout", key="top_logout_btn"):
           for key in list(st.session_state.keys()):
             del st.session_state[key]
@@ -207,7 +221,7 @@ def show_home_dashboard():
   # Quick action buttons row
   col_actions_space, col_actions = st.columns([2, 1])
   with col_actions_space:
-    col_a, col_b, col_c, col_d = st.columns(4)
+    col_a, col_b, col_c, col_d, col_e, col_f = st.columns(6)
 
     with col_a:
       if st.button("📊 View"):
@@ -245,6 +259,22 @@ def show_home_dashboard():
           role = check_user_access()
           if role:
             st.switch_page(google_collab)
+    with col_e:
+      if st.button("🛠️ Developer"):
+        if not is_logged_in:
+          login_dialog()
+        else:
+          role = check_user_access()
+          if role:
+            st.switch_page(developer_lab_page)
+    with col_f:
+      if st.button("📝 Tutorials"):
+        if not is_logged_in:
+          login_dialog()
+        else:
+          role = check_user_access()
+          if role:
+            st.switch_page(tutorial_page)
         
 
   try:
@@ -322,7 +352,7 @@ def show_home_dashboard():
               login_dialog()
             else:
               role = check_user_access()
-              if role:
+              if role and role != "Guest":
                 st.session_state.category = category_name
                 st.switch_page(collection_page)
 
@@ -332,18 +362,14 @@ def show_home_dashboard():
 # =========================================================================
 
 home_page = st.Page(show_home_dashboard, title="Home", icon="🏠", default=True)
-collection_page = st.Page(
-    "pages/collection.py", title="Collection Form", visibility="hidden"
-)
-view_data_page = st.Page(
-    "pages/view_data.py", title="View Collections", icon="📊"
-)
+collection_page = st.Page("pages/collection.py", title="Collection Form", visibility="hidden")
+view_data_page = st.Page("pages/view_data.py", title="View Collections", icon="📊")
 settings_page = st.Page("pages/settings.py", title="Settings Manager", icon="⚙️")
 roboflow = st.Page("pages/roboflow.py", title="RoboFlow", icon="🎯")
-google_collab = st.Page("pages/googleCollab.py", title="Google Collab", icon="🚀")
-
-# 🛠️ ADDED DEVELOPER LAB PAGE HERE
+google_colab = st.Page("pages/googleColab.py", title="Google Collab", icon="🚀")
 developer_lab_page = st.Page("pages/developer_lab.py", title="Developer Lab", icon="🛠️")
+tutorial_page = st.Page("pages/tutorial.py", title="Tutorials", icon="📝")
+feedback_page = st.Page("pages/feedback.py", title="Feedback",icon="✏️")
 
 active_page = st.navigation([
     home_page,
@@ -351,8 +377,10 @@ active_page = st.navigation([
     settings_page,
     collection_page,
     roboflow,
-    google_collab,
-    developer_lab_page,  # <--- Registered in navigation
+    google_colab,
+    developer_lab_page,
+    tutorial_page,
+    feedback_page
 ])
 
 user_obj = getattr(st, "user", None) or getattr(st, "experimental_user", None)

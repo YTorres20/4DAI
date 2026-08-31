@@ -8,3 +8,5 @@ pandas
 roboflow
 httpx
 fastparquet
+authlib
+jupyter
