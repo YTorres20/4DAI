@@ -11,4 +11,4 @@ fastparquet
 authlib
 jupyter
 numpy
-
+ngrok config add-authtoken 3HWbM4boZNb5VINOtVR0fXTsWqO_4zBFPXwkKtSvavaoM7Az
