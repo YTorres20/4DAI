@@ -57,31 +57,36 @@ def start_tunnel_and_register():
     
 @app.post("/capture-snapshot")
 def capture_snapshot():
-    """Takes a frame from the Kinect and returns Base64 image data and depth."""
+    """Takes a frame from the Kinect, waiting up to ~2 seconds for a live frame."""
     global kinect_runtime
     
     if kinect_runtime is None:
-        # Fallback dummy image only if hardware is completely uninitialized
-        img = Image.new('RGB', (1920, 1080), color=(73, 109, 137))
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG")
-        img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-        return {
-            "status": "success",
-            "sample_distance_mm": 500,
-            "image_base64": img_base64
-        }
+        raise HTTPException(status_code=500, detail="Kinect runtime is not initialized.")
     
     try:
-        # Directly grab the last color frame buffer
-        color_frame = kinect_runtime.get_last_color_frame()
-        
-        if color_frame is None:
-            raise HTTPException(status_code=500, detail="Kinect color frame returned empty.")
+        # Give the sensor more time and tries to feed a frame into the buffer (~2 seconds)
+        color_frame = None
+        for _ in range(30):
+            if kinect_runtime.has_new_color_frame():
+                color_frame = kinect_runtime.get_last_color_frame()
+                if color_frame is not None:
+                    break
+            time.sleep(0.07)
             
-        # PyKinect2 color frame is BGRA (1920x1080x4). Reshape and convert BGRA -> RGB
+        # If it's still empty, try one direct grab anyway
+        if color_frame is None:
+            color_frame = kinect_runtime.get_last_color_frame()
+            
+        if color_frame is None:
+            raise HTTPException(status_code=500, detail="Kinect color frame returned empty. Ensure sensor is unobstructed.")
+            
+        # Ensure the frame data matches expected 1920x1080x4 size
+        expected_size = 1920 * 1080 * 4
+        if len(color_frame) != expected_size:
+            color_frame = np.resize(color_frame, (expected_size,))
+            
+        # Reshape and swap BGRA to RGB
         color_img_data = color_frame.reshape((1080, 1920, 4))
-        # Drop alpha channel and swap BGR to RGB for correct colors
         rgb_img_data = color_img_data[:, :, [2, 1, 0]] 
         
         img = Image.fromarray(rgb_img_data.astype('uint8'), 'RGB')
@@ -90,10 +95,12 @@ def capture_snapshot():
         img.save(buffer, format="JPEG", quality=95)
         image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
         
-        # Capture Depth Frame / Calculate Sample Distance (Center point distance in mm)
+        # Depth frame
         depth_frame = kinect_runtime.get_last_depth_frame()
         center_index = (512 * 424 // 2) + (512 // 2)
         sample_distance_mm = int(depth_frame[center_index]) if depth_frame is not None else 0
+        
+        print(f"✅ Captured live frame! Distance: {sample_distance_mm}mm")
         
         return {
             "status": "success",
@@ -101,6 +108,7 @@ def capture_snapshot():
             "image_base64": image_base64
         }
     except Exception as e:
+        print(f"❌ Capture Exception: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Kinect capture error: {str(e)}")
 if __name__ == "main": 
     print("🚀 Main execution started. Spinning up background threads...")
