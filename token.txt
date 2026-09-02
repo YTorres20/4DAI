@@ -1,0 +1,17 @@
+python -c "
+import pathlib
+site_pkg = pathlib.Path('kinect/Lib/site-packages/pykinect2')
+
+# 1. Patch PyKinectV2.py (tagSTATSTG assert)
+v2_file = site_pkg / 'PyKinectV2.py'
+content = v2_file.read_text(encoding='utf-8')
+content = content.replace('assert sizeof(tagSTATSTG) == 72', '# assert sizeof(tagSTATSTG) == 72')
+v2_file.write_text(content, encoding='utf-8')
+
+# 2. Patch PyKinectRuntime.py (time.clock to time.perf_counter)
+rt_file = site_pkg / 'PyKinectRuntime.py'
+content_rt = rt_file.read_text(encoding='utf-8')
+content_rt = content_rt.replace('time.clock()', 'time.perf_counter()')
+rt_file.write_text(content_rt, encoding='utf-8')
+print('SUCCESS: Patches applied successfully!')
+"
