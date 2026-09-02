@@ -1,7 +1,10 @@
+import base64
 from datetime import date
+import io
 import json
 import re
 import requests
+from PIL import Image
 import streamlit as st
 from key import URL
 
@@ -145,13 +148,76 @@ camera_col, queue_col = st.columns([1.2, 1])
 
 with camera_col:
   st.markdown("📸 **Live Camera Feed**")
+  kinect_camera = page.get("camera", False)
   picture = st.camera_input("Position sample and capture image")
 
-  if picture:
-    if st.button("➕ Add Captured Image to Queue", use_container_width=True):
-      st.session_state.images.append(picture)
-      st.success("Image successfully added to queue!")
-      st.rerun()
+  st.info("🔌 Kinect hardware mode is enabled for this category.")
+    
+    # 1. Trigger button to fetch snapshot from the bridge
+  if kinect_camera:
+    st.info("🔌 Kinect hardware mode is enabled for this category.")
+    
+    # 1. Button to trigger the capture from the bridge
+    if st.button("📸 Take Kinect Snapshot", type="primary", use_container_width=True):
+      with st.spinner("Communicating with Windows Kinect station..."):
+        try:
+          response = requests.post(f"{URL}/collection/kinect-capture", timeout=15)
+          
+          if response.status_code == 200:
+            result = response.json()
+            st.session_state.temp_kinect_distance = result.get("sample_distance_mm", 0)
+            
+            # Decode Base64 into bytes for preview
+            img_bytes = base64.b64decode(result["image_base64"])
+            st.session_state.temp_kinect_preview = img_bytes
+            st.success("Snapshot captured successfully! Review below.")
+            st.rerun()
+          else:
+            st.error(f"Kinect capture failed: {response.json().get('detail', 'Unknown error')}")
+        except Exception as e:
+            st.error(f"Could not connect to Kinect bridge: {e}")
+
+    # 2. Verification step: If a temp snapshot exists, show preview and choices
+    if st.session_state.temp_kinect_preview is not None:
+      st.markdown("---")
+      st.markdown("🔍 **Verify Snapshot**")
+      
+      image_pil = Image.open(io.BytesIO(st.session_state.temp_kinect_preview))
+      st.image(image_pil, caption="Kinect Snapshot Preview", use_container_width=True)
+      st.info(f"📏 **Detected Sample Distance:** {st.session_state.temp_kinect_distance} mm")
+
+      v_col1, v_col2 = st.columns(2)
+      with v_col1:
+        if st.button("✅ Keep & Add to Queue", use_container_width=True):
+          # Save distance into metadata values
+          values["Kinect Sample Distance (mm)"] = st.session_state.temp_kinect_distance
+          
+          # Wrap bytes into BytesIO stream and push to main queue
+          final_picture = io.BytesIO(st.session_state.temp_kinect_preview)
+          final_picture.name = "kinect_capture.jpg"
+          st.session_state.images.append(final_picture)
+          
+          # Clear temporary state
+          st.session_state.temp_kinect_preview = None
+          st.session_state.temp_kinect_distance = None
+          st.success("Image added to queue!")
+          st.rerun()
+          
+      with v_col2:
+        if st.button("❌ Retake", use_container_width=True):
+          # Discard temp image
+          st.session_state.temp_kinect_preview = None
+          st.session_state.temp_kinect_distance = None
+          st.rerun()
+
+  else:
+    # Standard webcam fallback input if Kinect configuration is false
+    picture = st.camera_input("Position sample and capture image")
+    if picture:
+      if st.button("➕ Add Captured Image to Queue", use_container_width=True):
+        st.session_state.images.append(picture)
+        st.success("Image successfully added to queue!")
+        st.rerun()
 
 with queue_col:
   st.markdown(

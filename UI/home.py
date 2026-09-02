@@ -258,7 +258,7 @@ def show_home_dashboard():
         else:
           role = check_user_access()
           if role:
-            st.switch_page(google_collab)
+            st.switch_page(google_colab)
     with col_e:
       if st.button("🛠️ Developer"):
         if not is_logged_in:

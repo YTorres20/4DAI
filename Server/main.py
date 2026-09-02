@@ -2,9 +2,10 @@ from datetime import datetime
 import json
 import os
 import uuid
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, status
 from fastapi.responses import FileResponse
 from pymongo import MongoClient
+import requests
 
 # =========================================================================
 # APPLICATION SETUP & CONFIGURATION
@@ -408,3 +409,98 @@ def remove_feedback(payload: dict):
         json.dump(updated_feedback, infile, indent=4)
 
     return {"status": "success", "message": "Feedback removed."}
+
+kinect_registry_file = os.path.join(settings_folder, "kinect_nodes.json")
+
+
+@app.post("/collection/register-kinect")
+def register_kinect(payload: dict):
+    """Windows helper node calls this on startup to register its ngrok public link."""
+    node_id = payload.get("node_id", "primary_station")
+    incoming_url = payload.get("url")
+    
+    if not incoming_url:
+        raise HTTPException(status_code=400, detail="URL is required in registration payload.")
+    
+    registry = {}
+    if os.path.exists(kinect_registry_file):
+        try:
+            with open(kinect_registry_file, "r") as infile:
+                registry = json.load(infile)
+        except json.JSONDecodeError:
+            registry = {}
+    
+    registry[node_id] = {
+        "url": incoming_url,
+        "last_registered": datetime.now().isoformat()
+    }
+    
+    with open(kinect_registry_file, "w") as infile:
+        json.dump(registry, infile, indent=4)
+        
+    return {"status": "success", "node_id": node_id, "registered_url": incoming_url}
+
+
+@app.get("/collection/kinect-nodes")
+def get_kinect_nodes():
+    """Retrieves all registered Kinect station nodes from the settings folder."""
+    if not os.path.exists(kinect_registry_file):
+        return {}
+    try:
+        with open(kinect_registry_file, "r") as infile:
+            return json.load(infile)
+    except json.JSONDecodeError:
+        return {}
+
+
+@app.post("/collection/kinect-capture")
+def proxy_kinect_capture():
+    """
+    Streamlit calls this when capturing. It looks up the live ngrok URL 
+    from the JSON registry in the settings folder and proxies the request to Windows.
+    """
+    node_id = "primary_station"
+    
+    if not os.path.exists(kinect_registry_file):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No Kinect nodes registered yet. Please start the Windows helper script."
+        )
+    
+    try:
+        with open(kinect_registry_file, "r") as infile:
+            registry = json.load(infile)
+    except json.JSONDecodeError:
+        registry = {}
+        
+    node_info = registry.get(node_id)
+    if not node_info or not node_info.get("url"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Kinect node '{node_id}' has not registered yet."
+        )
+    
+    current_url = node_info["url"]
+    
+    try:
+        target_url = f"{current_url}/capture-snapshot"
+        response = requests.post(target_url, timeout=15)
+        
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Windows Kinect helper node failed to execute capture."
+            )
+        
+        kinect_data = response.json()
+        return {
+            "status": "success",
+            "sample_distance_mm": kinect_data.get("sample_distance_mm", 0),
+            "image_base64": kinect_data.get("image_base64", "")
+        }
+        
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Could not reach Windows Kinect bridge through ngrok: {str(e)}"
+        )
